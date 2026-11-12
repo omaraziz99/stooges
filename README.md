@@ -41,11 +41,15 @@ Open the app, create an account, go to **#project-orbit**, and type `/kpi-maya`.
 1. New project → **Deploy from GitHub repo** → pick this repo. In the service **Settings**, set
    **Root Directory** to `be`. Railway builds `be/Dockerfile` (see `be/railway.json`).
 2. **Volumes** → add a volume mounted at `/data`, so messages survive redeploys.
-3. **Variables**:
+3. **Variables** (none of these are secrets; keep API keys off the server):
    - `KPI_AGENT_PUBKEY`: the public key printed by `go run ./cmd/kpi -keygen`
+   - `SEED_ON_START=true`: loads the fictional `#project-orbit` channel on start (safe to keep on;
+     re-seeding adds no duplicates)
    - `ALLOWED_ORIGINS`: your Vercel URL, e.g. `https://stooges.vercel.app` (optional, recommended)
 4. **Networking** → **Generate Domain**. Your relay URL is `wss://<that-domain>`.
-5. Seed the fictional channel from your machine: `cd be && go run ./cmd/seed -relay wss://<that-domain>`
+
+Or from the CLI, inside `be/`: `railway login`, `railway init`, `railway up`, then add the volume,
+variables, and domain as above.
 
 ### 2. Web app on Vercel
 
@@ -61,9 +65,8 @@ Run the agent from your machine against the deployed relay; the report appears i
 cd be && go run ./cmd/kpi -relay wss://<your-railway-domain>
 ```
 
-To run it on a schedule instead, add a second Railway service from the same repo (root `be`), set its
-start command to `kpi -relay wss://<your-railway-domain>`, add a cron schedule, and give it
-`GEMINI_API_KEY`, `GEMINI_MODEL`, and `KPI_AGENT_SECRET`.
+Run it from your own machine so the Gemini key and `KPI_AGENT_SECRET` never sit on the hosting
+platform.
 
 ## Before using real data
 

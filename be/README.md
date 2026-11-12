@@ -28,6 +28,7 @@ go test ./...
 | `DB_PATH` | `stooges.db` | SQLite file; use a volume in production (`/data/stooges.db` in the Docker image) |
 | `KPI_AGENT_PUBKEY` | | The only key allowed to publish KPI reports. Locally, `KPI_AGENT_SECRET` in `.env` also works |
 | `ALLOWED_ORIGINS` | any | Comma-separated web origins allowed to connect |
+| `SEED_ON_START` | | `true` loads the fictional demo channel on start (Docker image only; idempotent) |
 
 Settings can also go in `be/.env` (see `.env.example`).
 
