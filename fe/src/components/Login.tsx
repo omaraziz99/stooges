@@ -3,7 +3,8 @@ import { motion, useReducedMotion } from 'motion/react'
 import { logIn, MIN_PASSWORD, signUp } from '../lib/auth'
 import { usePrefs, useT } from '../lib/prefs'
 import { cn } from '../lib/utils'
-import { ManglishSwitch, ThemeSwitch } from './PrefsControls'
+import { Logo } from './Logo'
+import { SettingsMenu } from './PrefsControls'
 import { LiquidGlass } from './ui/liquid-glass'
 
 // three.js is large, so the cube background loads only when the login page shows.
@@ -14,11 +15,18 @@ const BackgroundCubesGrid = lazy(() =>
 const EASE_OUT = [0.215, 0.61, 0.355, 1] as const
 
 /** Create an account (name, email, password) or log in (email, password). */
-export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: string | null) => void }) {
+export function Login({
+  onLogin,
+  initialMode = 'signup',
+}: {
+  onLogin: (secretKey: Uint8Array, name: string | null) => void
+  /** Which tab to start on: #/signup ("Try now") or #/login. */
+  initialMode?: 'signup' | 'login'
+}) {
   const reduceMotion = useReducedMotion()
   const t = useT()
   const { theme } = usePrefs()
-  const [mode, setMode] = useState<'signup' | 'login'>('signup')
+  const [mode, setMode] = useState<'signup' | 'login'>(initialMode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -52,17 +60,17 @@ export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: stri
     cn(
       'flex-1 rounded-full py-1.5 text-sm font-medium transition-colors',
       active
-        ? 'bg-white text-neutral-900 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06)]'
-        : 'text-neutral-500 hover:text-neutral-900',
+        ? 'bg-white text-gray-900 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06)]'
+        : 'text-gray-500 hover:text-gray-900',
     )
-  const label = 'block text-sm font-medium text-neutral-900'
+  const label = 'block text-sm font-medium text-gray-900'
   const field =
-    'mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[15px] text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-black/30 disabled:opacity-60'
+    'mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[15px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-black/30 disabled:opacity-60'
 
   return (
     <main className="relative isolate flex min-h-dvh w-full items-center justify-center overflow-hidden px-5 py-16">
-      <Suspense fallback={<div aria-hidden className="absolute inset-0 -z-10 bg-stone-50" />}>
-        {/* WebGL, so it can't use the CSS palette: Kopi O gets roasted cubes. */}
+      <Suspense fallback={<div aria-hidden className="absolute inset-0 -z-10 bg-gray-50" />}>
+        {/* WebGL, so it can't use the CSS palette: milk-tea cubes, or roasted ones in Kopi O. */}
         {theme === 'kopi-o' ? (
           <BackgroundCubesGrid
             className="-z-10"
@@ -72,15 +80,18 @@ export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: stri
             glowColor="#8a6248"
           />
         ) : (
-          <BackgroundCubesGrid className="-z-10" />
+          <BackgroundCubesGrid
+            className="-z-10"
+            topColor="#fcf8f3"
+            leftColor="#efe8df"
+            rightColor="#e3dbd0"
+            glowColor="#b5a898"
+          />
         )}
       </Suspense>
 
-      <div className="absolute top-4 right-4 flex flex-col items-end gap-2 sm:flex-row sm:items-center">
-        <div className="w-52">
-          <ThemeSwitch />
-        </div>
-        <ManglishSwitch className="rounded-full bg-white/80 py-1 pr-1.5 pl-3 shadow-sm ring-1 ring-black/5 backdrop-blur" />
+      <div className="absolute top-4 right-4 z-10">
+        <SettingsMenu />
       </div>
 
       <motion.div
@@ -89,7 +100,12 @@ export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: stri
         transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.1 }}
         className="flex w-full max-w-sm flex-col items-center antialiased"
       >
-        <h1 className="text-[clamp(36px,5vw,52px)] font-medium tracking-[-0.03em] text-neutral-900">Stooges</h1>
+        <h1>
+          {/* Back to the landing page. */}
+          <a href="#/" className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500">
+            <Logo className="h-16 sm:h-20" />
+          </a>
+        </h1>
 
         <LiquidGlass
           radius={24}
@@ -160,7 +176,7 @@ export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: stri
           <button
             type="submit"
             disabled={busy}
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-neutral-900 px-5 text-[15px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-colors hover:bg-neutral-800 disabled:opacity-60"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-brand-600 px-5 text-[15px] font-semibold text-on-brand shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {busy
               ? t(mode === 'signup' ? 'Creating account…' : 'Logging in…')

@@ -3,16 +3,81 @@
 /* For people who ask the OS for less transparency: glass falls back to solid. */
 @custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
 
+/* Plus Jakarta Sans, served from public/fonts (SIL Open Font License, see
+   OFL.txt there), so nobody needs it installed and no font CDN is called.
+   One variable file per subset covers every weight from 200 to 800. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+    U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/fonts/plus-jakarta-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* The palette: one brand colour, the logo's blue (#2875fd is brand-500), and
+   grey for everything else. The greys (and white) are warm: a touch of milk
+   tea in Teh Susu, and of black coffee in Kopi O. The only other hues are status colours (rose for
+   errors and deleting, amber and emerald for the connection dot and the
+   partial-report warning) and the KPI chart colours (--series-*), which tell
+   seven KPI items apart.
+
+   Buttons use brand-600 (white text 5.8:1; on brand-500 it is only 4.2:1),
+   links brand-700. Text on a brand fill uses text-on-brand, which stays white
+   in Kopi O (text-white does not: Kopi O redefines white as the panel colour). */
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  --color-brand-50: #f0f5fe;
+  --color-brand-100: #dce9fe;
+  --color-brand-200: #bdd5ff;
+  --color-brand-300: #94bbfe;
+  --color-brand-400: #5f99fe;
+  --color-brand-500: #2875fd;
+  --color-brand-600: #095ce2;
+  --color-brand-700: #024abd;
+  --color-brand-800: #003997;
+  --color-brand-900: #00276c;
+  --color-on-brand: #ffffff;
+  --color-danger: #be123c; /* delete buttons; stays dark red in Kopi O, where rose-700 turns light */
+  --color-logo: #11192a; /* the wordmark's navy, from the logo file */
+
+  /* Teh Susu greys: grey with a little milk tea. Text pairs checked: gray-500
+     is at least 4.5:1 on white, gray-50 and gray-100. */
+  --color-white: oklch(99.3% 0.005 80);
+  --color-gray-50: oklch(97.7% 0.008 78);
+  --color-gray-100: oklch(95.8% 0.011 75);
+  --color-gray-200: oklch(91.8% 0.014 72);
+  --color-gray-300: oklch(86.2% 0.016 70);
+  --color-gray-400: oklch(71% 0.018 66);
+  --color-gray-500: oklch(53.5% 0.018 62);
+  --color-gray-600: oklch(44.5% 0.016 60);
+  --color-gray-700: oklch(37% 0.014 58);
+  --color-gray-800: oklch(27% 0.012 56);
+  --color-gray-900: oklch(21.5% 0.01 55);
+  --color-gray-950: oklch(14.5% 0.008 55);
+}
+
 /* Two themes, switched with data-theme on <html> (see src/lib/prefs.tsx):
    "teh-susu" (light, the default) and "kopi-o" (dark).
 
    Components are written once, with the light palette. Kopi O swaps the
-   palette itself: the neutral scale is flipped (white panels become dark
-   coffee, dark text becomes cream) and the few accent tints that are used
-   as backgrounds are darkened. So every screen changes together, with no
-   per-component dark styles to keep in sync. */
+   palette itself: the grey scale is flipped (white panels become dark
+   coffee, dark text becomes light) and the brand tints used as backgrounds are
+   darkened. So every screen changes together, with no per-component dark
+   styles to keep in sync. */
 :root {
-  --app-bg: #fff;
+  --app-bg: oklch(97.5% 0.012 75); /* milk tea, a shade deeper than the panels */
   color-scheme: light;
   /* Chart colours for KPI items (categorical slots 1-7, validated light). */
   --series-1: #2a78d6;
@@ -40,43 +105,34 @@
   --color-white: oklch(21% 0.013 55);
   --color-black: oklch(96% 0.01 80);
 
-  /* Stone, flipped, with a warm coffee tint. */
-  --color-stone-50: oklch(24% 0.013 55);
-  --color-stone-100: oklch(27% 0.014 55);
-  --color-stone-200: oklch(33% 0.014 55);
-  --color-stone-300: oklch(41% 0.014 58);
-  --color-stone-400: oklch(56% 0.014 62);
-  --color-stone-500: oklch(67% 0.013 66);
-  --color-stone-600: oklch(75% 0.012 70);
-  --color-stone-700: oklch(83% 0.01 75);
-  --color-stone-800: oklch(89% 0.009 78);
-  --color-stone-900: oklch(94% 0.008 80);
-  --color-stone-950: oklch(97% 0.006 80);
+  /* Grey, flipped, with a black-coffee tint. */
+  --color-gray-50: oklch(24% 0.013 55);
+  --color-gray-100: oklch(27% 0.014 55);
+  --color-gray-200: oklch(33% 0.014 55);
+  --color-gray-300: oklch(41% 0.014 58);
+  --color-gray-400: oklch(56% 0.014 62);
+  --color-gray-500: oklch(67% 0.013 66);
+  --color-gray-600: oklch(75% 0.012 70);
+  --color-gray-700: oklch(83% 0.01 75);
+  --color-gray-800: oklch(89% 0.009 78);
+  --color-gray-900: oklch(94% 0.008 80);
+  --color-gray-950: oklch(97% 0.006 80);
 
-  --color-neutral-50: oklch(24% 0.01 55);
-  --color-neutral-100: oklch(27% 0.01 55);
-  --color-neutral-200: oklch(33% 0.01 55);
-  --color-neutral-300: oklch(41% 0.01 58);
-  --color-neutral-400: oklch(56% 0.01 62);
-  --color-neutral-500: oklch(67% 0.01 66);
-  --color-neutral-600: oklch(75% 0.008 70);
-  --color-neutral-700: oklch(83% 0.007 75);
-  --color-neutral-800: oklch(89% 0.006 78);
-  --color-neutral-900: oklch(94% 0.005 80);
-  --color-neutral-950: oklch(97% 0.004 80);
+  /* Brand tints used as backgrounds become deep, brand text becomes light.
+     The fills (400 to 600) stay as they are. */
+  --color-brand-50: oklch(26% 0.05 261);
+  --color-brand-100: oklch(30% 0.07 261);
+  --color-brand-200: oklch(36% 0.09 261);
+  --color-brand-300: oklch(45% 0.12 261);
+  --color-brand-700: #94bbfe;
+  --color-brand-800: #bdd5ff;
+  --color-logo: #f7efe4;
 
-  /* Accent tints used as light backgrounds become deep, their text light. */
-  --color-emerald-50: oklch(28% 0.05 165);
-  --color-emerald-100: oklch(32% 0.06 165);
-  --color-emerald-300: oklch(45% 0.09 165);
-  --color-emerald-800: oklch(85% 0.12 165);
-  --color-sky-50: oklch(28% 0.04 240);
-  --color-sky-300: oklch(45% 0.08 240);
-  --color-sky-700: oklch(78% 0.11 235);
-  --color-sky-800: oklch(84% 0.09 235);
+  /* Status tints, likewise. */
   --color-amber-50: oklch(29% 0.05 70);
   --color-amber-300: oklch(48% 0.1 75);
   --color-amber-900: oklch(88% 0.1 85);
+  --color-rose-50: oklch(28% 0.06 17);
   --color-rose-600: oklch(72% 0.17 17);
   --color-rose-700: oklch(70% 0.17 17);
 }
@@ -88,11 +144,11 @@ body,
 }
 
 body {
-  @apply bg-stone-100 text-stone-900 antialiased;
+  @apply bg-gray-100 text-gray-900 antialiased;
 }
 
-/* The "window" colour behind the sidebar and the chat panel, as in Buzz:
-   white in Teh Susu, dark roast in Kopi O. */
+/* The "window" colour behind the sidebar and the chat panel: milk tea in Teh
+   Susu, black coffee in Kopi O. */
 .app-backdrop {
   background: var(--app-bg);
 }

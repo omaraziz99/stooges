@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { EllipsisVertical, Lock, Star, Trash2 } from 'lucide-react'
+import { ChartColumn, EllipsisVertical, EyeOff, Lock, Star, Trash2, Undo2, Users } from 'lucide-react'
 import { deleteChannel, errorText, sendMessage, setChannelKpiReview, type Channel, type ChannelState } from '../lib/chat'
 import { useT } from '../lib/prefs'
 import { useStars } from '../lib/stars'
 import { useNotify, useRelay } from '../state/relay'
 import { Composer, type Suggestion } from './Composer'
+import { ConfirmDialog } from './ConfirmDialog'
 import { MessageList } from './MessageList'
 
 export function ChannelView({
@@ -30,28 +31,18 @@ export function ChannelView({
   const isCreator = channel.creator !== '' && channel.creator === pubkey
   const { stars, toggle: toggleStar } = useStars(pubkey)
   const starred = stars.has(channel.id)
+  const [asking, setAsking] = useState<'review' | 'delete' | null>(null)
+  const stopAsking = () => setAsking(null)
 
   const toggleReview = async () => {
-    const next = !channel.kpiReview
-    const question = next
-      ? t(
-          'Include #{name} in KPI insights?\n\nThe KPI agent will read messages here from people who have opted in. Everyone in the channel will see a badge saying so.',
-          { name: channel.name },
-        )
-      : t('Stop including #{name} in KPI insights?', { name: channel.name })
-    if (!window.confirm(question)) return
     try {
-      await setChannelKpiReview(client, channel.id, next)
+      await setChannelKpiReview(client, channel.id, !channel.kpiReview)
     } catch (err) {
       notify(errorText(err))
     }
   }
 
   const removeChannel = async () => {
-    const question = t('Delete #{name}? Every message in it is deleted for everyone. This cannot be undone.', {
-      name: channel.name,
-    })
-    if (!window.confirm(question)) return
     try {
       await deleteChannel(client, channel.id)
     } catch (err) {
@@ -61,8 +52,8 @@ export function ChannelView({
 
   const intro = (
     <div className="px-5 pb-4">
-      <p className="text-xl font-bold text-stone-900"># {channel.name}</p>
-      <p className="text-sm text-stone-500">
+      <p className="text-xl font-bold text-gray-900"># {channel.name}</p>
+      <p className="text-sm text-gray-500">
         {loaded
           ? `${t('This is the start of #{name}.', { name: channel.name })}${channel.about ? ` ${channel.about}` : ''}`
           : t('Loading messages…')}
@@ -72,21 +63,21 @@ export function ChannelView({
 
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-white">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-stone-200 px-4">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-gray-200 px-4">
         <button
           onClick={onOpenSidebar}
-          className="rounded p-1.5 text-stone-600 hover:bg-stone-100 md:hidden"
+          className="rounded p-1.5 text-gray-600 hover:bg-gray-100 md:hidden"
           aria-label={t('Open channel list')}
         >
           ☰
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1">
-          <h1 className="truncate text-[17px] font-semibold text-stone-900">
+          <h1 className="truncate text-[17px] font-semibold text-gray-900">
             {channel.kpiReview ? (
-              <Lock aria-label={t('Work channel')} className="mr-1.5 inline size-4 -translate-y-px text-stone-400" />
+              <Lock aria-label={t('Work channel')} className="mr-1.5 inline size-4 -translate-y-px text-gray-400" />
             ) : (
-              <span className="mr-1 font-normal text-stone-400">#</span>
+              <span className="mr-1 font-normal text-gray-400">#</span>
             )}
             {channel.name}
           </h1>
@@ -95,12 +86,12 @@ export function ChannelView({
             aria-pressed={starred}
             aria-label={starred ? t('Unstar channel') : t('Star channel')}
             title={starred ? t('Unstar channel') : t('Star channel')}
-            className="shrink-0 rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
           >
-            <Star aria-hidden className={`size-4 ${starred ? 'fill-amber-400 text-amber-500' : ''}`} />
+            <Star aria-hidden className={`size-4 ${starred ? 'fill-brand-500 text-brand-500' : ''}`} />
           </button>
           </div>
-          {channel.about && <p className="truncate text-xs text-stone-500">{channel.about}</p>}
+          {channel.about && <p className="truncate text-xs text-gray-500">{channel.about}</p>}
         </div>
         <span
           title={
@@ -110,19 +101,61 @@ export function ChannelView({
           }
           className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
             channel.kpiReview
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-              : 'border-stone-200 bg-stone-50 text-stone-500'
+              ? 'border-brand-200 bg-brand-50 text-brand-800'
+              : 'border-gray-200 bg-gray-50 text-gray-500'
           }`}
         >
           {channel.kpiReview ? t('KPI insights on') : t('Not reviewed')}
         </span>
         {isCreator && (
-          <button onClick={toggleReview} className="shrink-0 text-xs font-medium text-sky-700 hover:underline">
+          <button onClick={() => setAsking('review')} className="shrink-0 text-xs font-medium text-brand-700 hover:underline">
             {channel.kpiReview ? t('Turn off') : t('Turn on')}
           </button>
         )}
-        <ChannelMenu starred={starred} onToggleStar={() => toggleStar(channel.id)} onDelete={removeChannel} />
+        <ChannelMenu starred={starred} onToggleStar={() => toggleStar(channel.id)} onDelete={() => setAsking('delete')} />
       </header>
+
+      {asking === 'review' &&
+        (channel.kpiReview ? (
+          <ConfirmDialog
+            icon={ChartColumn}
+            title={t('Stop including #{name} in KPI insights?', { name: channel.name })}
+            points={[
+              [EyeOff, t('The agent stops reading this channel from its next run')],
+              [Undo2, t('You can turn it back on at any time')],
+            ]}
+            cancelLabel={t('Keep it on')}
+            confirmLabel={t('Turn off')}
+            onConfirm={toggleReview}
+            onClose={stopAsking}
+          />
+        ) : (
+          <ConfirmDialog
+            icon={ChartColumn}
+            title={t('Include #{name} in KPI insights?', { name: channel.name })}
+            points={[
+              [Lock, t('The agent reads messages here only from people who opted in')],
+              [Users, t('Everyone in the channel sees a "KPI insights on" badge')],
+              [Undo2, t('You can turn it off at any time')],
+            ]}
+            cancelLabel={t('Not now')}
+            confirmLabel={t('Turn on')}
+            onConfirm={toggleReview}
+            onClose={stopAsking}
+          />
+        ))}
+      {asking === 'delete' && (
+        <ConfirmDialog
+          danger
+          icon={Trash2}
+          title={t('Delete #{name}?', { name: channel.name })}
+          description={t('Every message in it is deleted for everyone. This cannot be undone.')}
+          cancelLabel={t('Cancel')}
+          confirmLabel={t('Delete channel')}
+          onConfirm={removeChannel}
+          onClose={stopAsking}
+        />
+      )}
 
       <MessageList
         key={`list-${channel.id}`}
@@ -187,7 +220,7 @@ function ChannelMenu({
         aria-expanded={open}
         aria-label={t('Channel settings')}
         title={t('Channel settings')}
-        className="rounded p-1.5 text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
       >
         <EllipsisVertical aria-hidden className="size-4" />
       </button>
@@ -196,11 +229,11 @@ function ChannelMenu({
           role="menu"
           className="absolute top-full right-0 z-20 mt-1 w-48 rounded-xl bg-white p-1 shadow-lg ring-1 ring-black/10"
         >
-          <button role="menuitem" className={`${item} text-stone-800`} onClick={run(onToggleStar)}>
-            <Star aria-hidden className={`size-4 ${starred ? 'fill-amber-400 text-amber-500' : 'text-stone-500'}`} />
+          <button role="menuitem" className={`${item} text-gray-800`} onClick={run(onToggleStar)}>
+            <Star aria-hidden className={`size-4 ${starred ? 'fill-brand-500 text-brand-500' : 'text-gray-500'}`} />
             {starred ? t('Unstar channel') : t('Star channel')}
           </button>
-          <div role="separator" className="my-1 border-t border-stone-200" />
+          <div role="separator" className="my-1 border-t border-gray-200" />
           <button role="menuitem" className={`${item} text-rose-700`} onClick={run(onDelete)}>
             <Trash2 aria-hidden className="size-4" />
             {t('Delete channel')}

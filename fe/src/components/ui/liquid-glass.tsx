@@ -144,8 +144,8 @@ export function LiquidGlass({
       data-refract={mode === "pending" && filter ? "true" : "false"}
       className={cn(
         "relative overflow-hidden",
-        mode === "simple" && "bg-white/70 dark:bg-neutral-900/60",
-        mode === "opaque" && "bg-white dark:bg-neutral-900",
+        mode === "simple" && "bg-white/70 dark:bg-gray-900/60",
+        mode === "opaque" && "bg-white dark:bg-gray-900",
         className,
       )}
       style={{

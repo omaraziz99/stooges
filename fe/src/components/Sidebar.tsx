@@ -365,7 +365,7 @@ function Me() {
           className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-black/[0.04]"
         >
           <span className="relative">
-            <Avatar pubkey={pubkey} name={name} />
+            <Avatar name={name} />
             <span
               className={`absolute right-0 bottom-0 size-2 rounded-full ring-[1.5px] ring-white ${STATUS[status].dot}`}
               title={statusLabel}
