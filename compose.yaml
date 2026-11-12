@@ -1,0 +1,26 @@
+# Local demo: `docker compose up --build`, then open http://localhost:5173.
+# Wipe all data (messages, accounts, files): `docker compose down -v`.
+services:
+  relay:
+    build: ./be
+    ports:
+      - "7777:7777"
+    environment:
+      SEED_ON_START: "true" # fictional demo channels and logins; re-seeding adds no duplicates
+      DB_PATH: /data/stooges.db # keep data on the volume even if be/.env sets DB_PATH
+    env_file:
+      # Optional: KPI_AGENT_SECRET (and GEMINI_API_KEY) for the KPI agent. See README.
+      - path: be/.env
+        required: false
+    volumes:
+      - relay-data:/data
+
+  web:
+    build: ./fe
+    ports:
+      - "5173:80"
+    depends_on:
+      - relay
+
+volumes:
+  relay-data:

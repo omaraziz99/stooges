@@ -35,6 +35,23 @@ cd fe && pnpm install && pnpm dev    # http://localhost:5173
 cd be && go run ./cmd/kpi
 ```
 
+Or with Docker, from the repo root (no Go or Node needed):
+
+```bash
+docker compose up --build    # relay + sample data on :7777, web app on http://localhost:5173
+```
+
+For KPI reports, create the agent key once, recreate the relay so it picks the key up, then run the
+agent inside the relay container:
+
+```bash
+docker compose run --rm -T relay kpi -keygen >> be/.env
+docker compose up --build -d
+docker compose exec relay kpi -sample   # or `kpi`, with GEMINI_API_KEY in be/.env
+```
+
+Data lives in the `relay-data` volume; `docker compose down -v` wipes it.
+
 Open the app, create an account, go to **#project-orbit**, and type `/kpi-maya`.
 
 The agent only reads channels marked **KPI insights on** (a badge in the channel header, set by
