@@ -1,14 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getPublicKey } from 'nostr-tools/pure'
+import { RELAY_URL } from '../lib/config'
 import { RelayClient, type Filter, type NostrEvent, type Status } from '../lib/relay'
 import { buildChannels, buildProfiles, CONSENT_TAG, Kind, type Profile } from '../lib/chat'
 import { parseReport, REPORT_KIND, REPORT_TAG, type KpiReport } from '../lib/kpi'
-
-// In production set VITE_RELAY_URL (e.g. wss://your-relay.up.railway.app).
-// Locally it falls back to port 7777 on the same host.
-const RELAY_URL =
-  import.meta.env.VITE_RELAY_URL ||
-  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname || 'localhost'}:7777`
 
 type RelayContextValue = {
   client: RelayClient

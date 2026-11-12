@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { ArrowUp, CornerDownLeft } from 'lucide-react'
 import { errorText } from '../lib/chat'
 
 export type Suggestion = { value: string; label: string; hint?: string }
@@ -75,6 +76,7 @@ export function Composer({
   }
 
   const rows = Math.min(8, Math.max(1, text.split('\n').length))
+  const isCommand = !!onCommand && text.trim().startsWith('/')
 
   return (
     <form onSubmit={submit} className="relative shrink-0 px-4 pb-4">
@@ -107,7 +109,7 @@ export function Composer({
         </ul>
       )}
       {error && <p className="mb-1.5 px-1 text-sm text-rose-600">{error}</p>}
-      <div className="flex items-end gap-2 rounded-xl border border-stone-300 bg-white p-2 shadow-sm focus-within:border-stone-500">
+      <div className="rounded-2xl border border-stone-200 bg-white px-3 pt-2.5 pb-2 shadow-[0_1px_2px_rgb(0_0_0/0.04)] focus-within:border-stone-300 focus-within:shadow-[0_2px_8px_rgb(0_0_0/0.06)]">
         <textarea
           ref={inputRef}
           value={text}
@@ -121,15 +123,19 @@ export function Composer({
           placeholder={placeholder}
           disabled={disabled}
           aria-label={placeholder}
-          className="max-h-48 min-h-6 flex-1 resize-none bg-transparent px-2 py-1 leading-6 outline-none placeholder:text-stone-400 disabled:cursor-not-allowed"
+          className="block max-h-48 min-h-6 w-full resize-none bg-transparent leading-6 outline-none placeholder:text-stone-400 disabled:cursor-not-allowed"
         />
-        <button
-          type="submit"
-          disabled={!text.trim() || sending || disabled}
-          className="rounded-lg bg-sky-700 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-stone-300"
-        >
-          {sending ? 'Sending…' : text.trim().startsWith('/') && onCommand ? 'Run' : 'Send'}
-        </button>
+        <div className="mt-1.5 flex items-center justify-end gap-2">
+          <button
+            type="submit"
+            disabled={!text.trim() || sending || disabled}
+            aria-label={sending ? 'Sending' : isCommand ? 'Run' : 'Send'}
+            title={isCommand ? 'Run command' : 'Send'}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+          >
+            {isCommand ? <CornerDownLeft aria-hidden className="size-4" /> : <ArrowUp aria-hidden className="size-4" />}
+          </button>
+        </div>
       </div>
     </form>
   )

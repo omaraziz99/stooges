@@ -85,8 +85,16 @@ export class RelayClient {
   close() {
     this.closedByUs = true
     clearTimeout(this.retryTimer)
-    this.ws?.close()
+    const ws = this.ws
     this.ws = null
+    if (ws?.readyState === WebSocket.CONNECTING) {
+      // Closing mid-handshake logs a browser error (React StrictMode does this
+      // in development); close quietly once it opens instead.
+      ws.onopen = () => ws.close()
+      ws.onmessage = null
+    } else {
+      ws?.close()
+    }
     this.setStatus('offline')
   }
 

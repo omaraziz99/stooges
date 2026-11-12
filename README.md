@@ -57,9 +57,14 @@ as public.
    - `SEED_ON_START=true`: loads the fictional sample channels on start (safe to keep on;
      re-seeding adds no duplicates)
    - `MANAGER_PUBKEYS`: comma-separated public keys of the managers allowed to read everyone's
-     KPI report. Each manager gets theirs from **Copy public key** in the app's sidebar. Everyone
-     else can read only their own report; unset, nobody can read the team's.
-   - `ALLOWED_ORIGINS`: your Vercel URL, e.g. `https://stooges.vercel.app` (optional, recommended)
+     KPI report. Each manager gets theirs from **Copy public key** in the account menu (click your
+     name in the sidebar). Everyone else can read only their own report; unset, nobody can read the
+     team's.
+   - `ALLOWED_ORIGINS` (optional): comma-separated origins allowed to connect, exactly as the browser
+     sends them: scheme and host, no path, no trailing slash. For example
+     `https://stooges.vercel.app,https://stooges-*.vercel.app,http://localhost:5173`. `*` matches
+     anything; keep it project-specific (`https://*.vercel.app` would admit every Vercel site).
+     If the browser shows a WebSocket `403`, the relay log names the rejected origin.
 4. **Networking** → **Generate Domain**. Your relay URL is `wss://<that-domain>`.
 
 Or from the CLI, inside `be/`: `railway login`, `railway init`, `railway up`, then add the volume,
@@ -89,7 +94,7 @@ This is a proof of concept. Before pointing it at real conversations:
 - **Access:** anyone who can open the app can read every channel. A person can read only their own
   KPI report, and the keys in `MANAGER_PUBKEYS` can read everyone's, but every manager sees every
   person. Restrict who can sign in, and limit each manager to their own reports.
-- **Keys:** identities are keys stored in the browser's localStorage.
+- **Accounts:** email and password, with no email verification and no password reset yet. After log-in, the decrypted key stays in the browser's localStorage until sign-out.
 - **AI provider:** the agent sends chat text to Gemini (or Claude). Free-tier Gemini data may be
   used to improve Google's products; use a paid or company-approved account.
 - **People:** tell the team what is collected and why, keep DMs and private channels out, and treat

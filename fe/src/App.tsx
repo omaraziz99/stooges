@@ -148,7 +148,7 @@ function Workspace({ newName }: { newName: string | null }) {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="app-backdrop flex h-dvh overflow-hidden">
       <Sidebar
         channels={channels}
         activeId={activeId}
@@ -161,6 +161,7 @@ function Workspace({ newName }: { newName: string | null }) {
           setSidebarOpen(false)
         }}
       />
+      <div className="flex min-w-0 flex-1 overflow-hidden bg-white md:my-2 md:mr-2 md:rounded-2xl md:shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.25)] md:ring-1 md:ring-black/5">
       {view === 'kpi' ? (
         <KpiDashboard
           report={report}
@@ -201,6 +202,7 @@ function Workspace({ newName }: { newName: string | null }) {
           onClose={() => setThreadRootId(null)}
         />
       )}
+      </div>
     </div>
   )
 }

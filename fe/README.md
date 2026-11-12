@@ -15,7 +15,7 @@ On Vercel, set it under Project → Environment Variables and use `fe` as the ro
 
 ## Features
 
-- Accounts are keys generated in the browser, or sign in with an existing `nsec` key
+- Create an account with name, email and password, or log in with email and password (the password never leaves the browser; see `be/README.md`)
 - Channels, threads, emoji reactions, deleting your own messages, live updates
 - **KPI insights**: team totals per pillar, a profile per person with an AI-drafted review and
   evidence linked back to the original messages

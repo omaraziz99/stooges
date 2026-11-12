@@ -1,6 +1,6 @@
-// Your identity is a secret key kept in this browser's localStorage.
-// That's fine for a POC; a real deployment would use a signer extension or
-// an encrypted keystore instead.
+// After logging in, the (decrypted) chat key is kept in this browser's
+// localStorage so you stay signed in. Signing out removes it; the encrypted
+// copy stays on the server for the next log-in.
 import * as nip19 from 'nostr-tools/nip19'
 
 const STORAGE_KEY = 'stooges.secretKey'
@@ -29,21 +29,6 @@ export function clearSecretKey() {
     // ignore
   }
 }
-
-/** Accepts an nsec1… key or 64 hex characters. Throws on anything else. */
-export function parseSecretKey(input: string): Uint8Array {
-  const value = input.trim()
-  if (/^[0-9a-fA-F]{64}$/.test(value)) return hexToBytes(value.toLowerCase())
-  try {
-    const decoded = nip19.decode(value)
-    if (decoded.type === 'nsec') return decoded.data
-  } catch {
-    // fall through
-  }
-  throw new Error('That is not a valid secret key (expected nsec1… or 64 hex characters).')
-}
-
-export const toNsec = (sk: Uint8Array) => nip19.nsecEncode(sk)
 
 export function shortNpub(pubkey: string) {
   const npub = nip19.npubEncode(pubkey)

@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* For people who ask the OS for less transparency: glass falls back to solid. */
+@custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
+
 html,
 body,
 #root {
@@ -8,4 +11,13 @@ body,
 
 body {
   @apply bg-stone-100 text-stone-900 antialiased;
+}
+
+/* The "window" colour behind the frosted sidebar: warm pale yellow at the
+   top fading to a soft blue, like a macOS sidebar over a desktop wallpaper. */
+.app-backdrop {
+  background:
+    radial-gradient(60rem 30rem at 0% 0%, rgb(238 232 172 / 0.95), transparent 70%),
+    radial-gradient(50rem 40rem at 10% 100%, rgb(178 199 224 / 0.95), transparent 70%),
+    linear-gradient(180deg, #ebe7c2 0%, #d9ddcf 45%, #c3d0dd 100%);
 }

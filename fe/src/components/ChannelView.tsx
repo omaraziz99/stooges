@@ -59,7 +59,10 @@ export function ChannelView({
           ☰
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate font-semibold text-stone-900"># {channel.name}</h1>
+          <h1 className="truncate text-[17px] font-semibold text-stone-900">
+            <span className="mr-1 font-normal text-stone-400">#</span>
+            {channel.name}
+          </h1>
           {channel.about && <p className="truncate text-xs text-stone-500">{channel.about}</p>}
         </div>
         <span
