@@ -30,7 +30,8 @@ Frontend, from `fe/`:
 ```bash
 pnpm install
 pnpm dev          # http://localhost:5173, connects to ws://<host>:7777 unless VITE_RELAY_URL is set
-pnpm typecheck    # the only check: no test runner or linter is configured
+pnpm typecheck
+pnpm test         # node runs src/lib/reviews.test.ts directly (no test framework)
 pnpm build
 ```
 
@@ -88,7 +89,11 @@ migration tool.
   (`unitsFromEvents` in `source.go`).
 - Findings must cite messages the contributor actually wrote, on an item of their own level
   (`Validate`). Reviews have no score, ranking or weaknesses (`ReviewSystemPrompt` in `review.go`).
-- A personal report (`d=kpi-report:<pubkey>`) is sent only to that person and to managers.
+- A personal report (`d=kpi-report:<pubkey>`) is sent only to that person and to managers, and so is
+  a review booking (kind `31923`) to the person in its `p` tag. Private kinds are listed in
+  `privateKinds`/`privateTo` in `be/internal/relay/relay.go`; a new private kind goes there too.
+- Suggested reviews are never ordered or chosen by amount of evidence (`suggestionReasons` in
+  `fe/src/lib/reviews.ts`): that would rank people.
 
 ## Frontend conventions
 
@@ -102,6 +107,28 @@ migration tool.
 - Themes are `teh-susu` (light) and `kopi-o` (dark). The `stooges-theme` localStorage key is also
   read by an inline script in `index.html`, so rename both together.
 - Wrap every localStorage access in try/catch (see `src/lib/keys.ts`, `src/lib/prefs.tsx`).
+- The team dashboard (`src/components/TeamDashboard.tsx`) is a separate page at `#/team` and
+  `#/team/<name>`. It is a hash route (`useHashRoute` in `App.tsx`), so it needs no router or server
+  rewrites; don't use `href="#..."` anchors for in-page scrolling, as they change the route.
+- Design system (`src/index.css`): the font is Plus Jakarta Sans, self-hosted from `public/fonts`.
+  There is one brand colour, `brand-*`, built from the logo's blue (`#2875fd` is `brand-500`), and
+  `gray-*` for everything else. The greys and `white` are redefined there with a warm tint: milk
+  tea in Teh Susu, black coffee in Kopi O. Don't add stone, neutral, sky or other accent hues. The only
+  exceptions are status colours (rose, amber, emerald) and the KPI chart colours (`--series-*`).
+  - Buttons use `bg-brand-600 text-on-brand`, and links use `text-brand-700`.
+  - Use `text-on-brand` for text on a brand fill, never `text-white`: Kopi O redefines `white` as
+    the dark panel colour.
+- To ask before an action, render `ConfirmDialog` only while asking (`{asking && <ConfirmDialog ... />}`).
+  Never use `window.confirm`. Pass `danger` when the action deletes something.
+  Other modals (for example the framework modal) use `Modal`, which `ConfirmDialog` is built on.
+- Signed out, `/` is the landing page (`src/components/Landing.tsx`) and `#/login` / `#/signup` the
+  login page (routing in `App()`). Its screenshots in `public/landing/` are real captures of the demo
+  data, `name-light.webp` and `name-dark.webp` at 1920x1200: re-capture them when those screens change.
+  Its hero is a scripted demo (`src/components/landing/HeroDemo.tsx`), and its kopi-shop mascots
+  (`landing/Cups.tsx`; Kopi is the dashboard's clay cup) stand for C3 KPI items: the one place `fe/` names
+  KPI items without reading a report. The landing page and the dashboard share `PillHeader`.
+- The logo is `src/components/Logo.tsx`. Its image files were cut from
+  `public/emoji/stooges_logo.png`, so if that file changes they need regenerating.
 
 ## Demo data
 

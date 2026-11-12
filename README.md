@@ -60,7 +60,9 @@ account menu: click your name in the sidebar). A new account is not opted in.
 
 The sample data has three work channels with review on (`#project-orbit`, `#platform-infra`,
 `#design-system`), two private ones the agent never reads (`#lunch-club`, `#weekend-hikers`), and
-seven opted-in people. The seed also creates two email accounts for them, so you can log in as
+nine opted-in people, two of them with no evidence yet (Hana Yusof, Daniel Wong). It also books a
+few performance reviews by the demo manager, past and upcoming, so the dashboard's **Suggested
+reviews** has something to show. The seed creates two email accounts, so you can log in as
 either:
 
 | Account type | Name | Email | Password |

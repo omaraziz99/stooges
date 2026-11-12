@@ -3,6 +3,7 @@ import { ChannelView } from './components/ChannelView'
 import type { Suggestion } from './components/Composer'
 import { KpiReviewPanel } from './components/KpiReviewPanel'
 import { commandFor, findPeople, parseKpiCommand, type Evidence } from './lib/kpi'
+import { Landing } from './components/Landing'
 import { Login } from './components/Login'
 import { Sidebar } from './components/Sidebar'
 import { TeamDashboard } from './components/TeamDashboard'
@@ -31,13 +32,14 @@ export default function App() {
     setSecretKey(null)
   }, [])
 
-  // Signed out: the login page, on Log in at #/login and on Create account otherwise.
+  // Signed out: the landing page, or the login page at #/login and #/signup.
   if (!secretKey) {
-    const mode = hash === '#/login' ? 'login' : 'signup'
+    const auth = hash.match(/^#\/(login|signup)$/)
+    if (!auth) return <Landing />
     return (
       <Login
-        key={mode}
-        initialMode={mode}
+        key={auth[1]}
+        initialMode={auth[1] as 'login' | 'signup'}
         onLogin={(sk, name) => {
           saveSecretKey(sk)
           setNewName(name)
