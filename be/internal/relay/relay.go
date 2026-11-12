@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"stooges/be/internal/nostr"
+	"stooges/be/internal/origin"
 	"stooges/be/internal/store"
 )
 
@@ -54,17 +55,15 @@ type Options struct {
 	// Managers are the hex pubkeys that may read everyone's KPI report.
 	Managers []string
 	// AllowedOrigins limits which web pages may connect, e.g.
-	// ["https://stooges.vercel.app"]. Empty allows any origin: identity comes
-	// from signed events, not cookies, so this is defence in depth.
+	// ["https://stooges.vercel.app", "https://*.vercel.app"]. A "*" matches
+	// any characters. Empty allows any origin: identity comes from signed
+	// events, not cookies, so this is defence in depth.
 	AllowedOrigins []string
 }
 
 // New creates a relay. key signs relay-authored events such as channel metadata.
 func New(st *store.Store, key *btcec.PrivateKey, log *slog.Logger, opts Options) *Relay {
-	allowed := map[string]bool{}
-	for _, o := range opts.AllowedOrigins {
-		allowed[strings.TrimRight(strings.TrimSpace(o), "/")] = true
-	}
+	allowed := origin.Normalize(opts.AllowedOrigins)
 	managers := map[string]bool{}
 	for _, m := range opts.Managers {
 		managers[m] = true
@@ -80,8 +79,13 @@ func New(st *store.Store, key *btcec.PrivateKey, log *slog.Logger, opts Options)
 			ReadBufferSize:  4096,
 			WriteBufferSize: 4096,
 			CheckOrigin: func(req *http.Request) bool {
-				origin := req.Header.Get("Origin")
-				return len(allowed) == 0 || origin == "" || allowed[origin]
+				from := req.Header.Get("Origin")
+				if origin.Allowed(allowed, from) {
+					return true
+				}
+				// Logged so a misconfigured ALLOWED_ORIGINS is easy to spot.
+				log.Warn("rejected WebSocket from origin not in ALLOWED_ORIGINS", "origin", from, "allowed", allowed)
+				return false
 			},
 		},
 		clients: map[*client]struct{}{},

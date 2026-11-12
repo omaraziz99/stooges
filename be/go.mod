@@ -6,6 +6,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go/v2 v2.9.0
 	github.com/btcsuite/btcd/btcec/v2 v2.5.1
 	github.com/gorilla/websocket v1.5.3
+	golang.org/x/crypto v0.59.0
 	modernc.org/sqlite v1.62.0
 )
 
@@ -35,7 +36,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect

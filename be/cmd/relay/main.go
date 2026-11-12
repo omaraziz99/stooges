@@ -26,6 +26,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 
+	"stooges/be/internal/accounts"
 	"stooges/be/internal/config"
 	"stooges/be/internal/nostr"
 	"stooges/be/internal/relay"
@@ -73,7 +74,12 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	srv := &http.Server{Addr: addr, Handler: r, ReadHeaderTimeout: 10 * time.Second}
+	// /api/* is email sign-up and log-in; everything else is the relay.
+	mux := http.NewServeMux()
+	mux.Handle("/api/", accounts.New(st, log, opts.AllowedOrigins))
+	mux.Handle("/", r)
+
+	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

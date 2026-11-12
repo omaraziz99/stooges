@@ -12,6 +12,8 @@ internal/store/  SQLite storage (pure Go, no cgo)
 internal/relay/  WebSocket protocol (relay.go) and per-kind rules (policy.go)
 internal/client/ minimal client used by seed and kpi
 internal/kpi/    conversation grouping, prompts, Gemini/Claude clients, cache, report
+internal/accounts/ email sign-up and log-in API
+internal/origin/  ALLOWED_ORIGINS matching
 internal/config/ .env loader
 ```
 
@@ -28,7 +30,7 @@ go test ./...
 | `DB_PATH` | `stooges.db` | SQLite file; use a volume in production (`/data/stooges.db` in the Docker image) |
 | `KPI_AGENT_PUBKEY` | | The only key allowed to publish KPI reports. Locally, `KPI_AGENT_SECRET` in `.env` also works |
 | `MANAGER_PUBKEYS` | nobody | Comma-separated hex public keys allowed to read everyone's KPI report. Everyone else can read only their own. In the app, **Copy public key** in the sidebar gives a user's key |
-| `ALLOWED_ORIGINS` | any | Comma-separated web origins allowed to connect |
+| `ALLOWED_ORIGINS` | any | Comma-separated web origins allowed to connect, e.g. `https://stooges.vercel.app,http://localhost:5173`; `*` wildcards allowed. Rejected origins are logged |
 | `SEED_ON_START` | | `true` loads the fictional demo channel on start (Docker image only; idempotent) |
 
 Settings can also go in `be/.env` (see `.env.example`).
@@ -50,6 +52,16 @@ What it supports:
   only to signed-in keys in `MANAGER_PUBKEYS`. Each person's own report
   (`d=kpi-report:<their pubkey>`) is sent to that person and to managers, nobody else.
 - Every event's ID and signature is verified before it's stored.
+
+## Accounts (email + password)
+
+The same server answers `POST /api/signup` and `POST /api/login` (CORS follows `ALLOWED_ORIGINS`).
+The password never reaches the server: the browser sends a PBKDF2-derived auth key (stored only as a
+bcrypt hash) and the user's chat key encrypted with the password (NIP-49 `ncryptsec`), which the
+server hands back after a successful log-in for the browser to decrypt. A leaked database holds no
+usable keys or passwords. Wrong password and unknown email get the same answer, and 10 failed
+attempts lock an email for 15 minutes. There is no password reset: the key can only be decrypted with
+the password.
 
 ## Seed
 

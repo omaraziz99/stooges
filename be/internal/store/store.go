@@ -52,6 +52,16 @@ CREATE TABLE IF NOT EXISTS groups (
 	created_at INTEGER NOT NULL
 );
 
+-- Email accounts. The chat key is stored only encrypted with the user's
+-- password (NIP-49 ncryptsec), and the login secret only as a bcrypt hash.
+CREATE TABLE IF NOT EXISTS accounts (
+	email      TEXT PRIMARY KEY,
+	pubkey     TEXT    NOT NULL UNIQUE,
+	auth_hash  TEXT    NOT NULL,
+	ncryptsec  TEXT    NOT NULL,
+	created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS relay_meta (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -305,6 +315,43 @@ func (s *Store) GroupExists(ctx context.Context, id string) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
+}
+
+// ErrAccountExists is returned when the email (or key) is already registered.
+var ErrAccountExists = errors.New("account already exists")
+
+// Account is a stored email account.
+type Account struct {
+	Email     string
+	PubKey    string
+	AuthHash  string // bcrypt hash of the client-derived login secret
+	Ncryptsec string // the user's chat key, encrypted with their password
+}
+
+// CreateAccount stores a new account. It returns ErrAccountExists if the
+// email or public key is taken.
+func (s *Store) CreateAccount(ctx context.Context, a Account, createdAt int64) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO accounts (email, pubkey, auth_hash, ncryptsec, created_at) VALUES (?, ?, ?, ?, ?)`,
+		a.Email, a.PubKey, a.AuthHash, a.Ncryptsec, createdAt)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrAccountExists
+	}
+	return nil
+}
+
+// GetAccount looks up an account by email; ok is false if there is none.
+func (s *Store) GetAccount(ctx context.Context, email string) (a Account, ok bool, err error) {
+	err = s.db.QueryRowContext(ctx,
+		`SELECT email, pubkey, auth_hash, ncryptsec FROM accounts WHERE email = ?`, email).
+		Scan(&a.Email, &a.PubKey, &a.AuthHash, &a.Ncryptsec)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Account{}, false, nil
+	}
+	return a, err == nil, err
 }
 
 // GetMeta reads a relay setting; ok is false if it is not set.
