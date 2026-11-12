@@ -30,6 +30,7 @@ go test ./...
 | `DB_PATH` | `stooges.db` | SQLite file; use a volume in production (`/data/stooges.db` in the Docker image) |
 | `KPI_AGENT_PUBKEY` | | The only key allowed to publish KPI reports. Locally, `KPI_AGENT_SECRET` in `.env` also works |
 | `ALLOWED_ORIGINS` | any | Comma-separated web origins allowed to connect, e.g. `https://stooges.vercel.app,http://localhost:5173`; `*` wildcards allowed. Rejected origins are logged |
+| `FILES_DIR` | `files` next to `DB_PATH` | Where chat attachments are stored (`/data/files` in the Docker image, so on the volume) |
 | `SEED_ON_START` | | `true` loads the fictional demo channel on start (Docker image only; idempotent) |
 
 Settings can also go in `be/.env` (see `.env.example`).
@@ -50,6 +51,16 @@ What it supports:
 - **Reading**: everything is public except KPI reports. The team report (`d=kpi-report`) is sent
   only to signed-in manager accounts (account type, `accounts.role = 'manager'`). Each person's own report
   (`d=kpi-report:<their pubkey>`) is sent to that person and to managers, nobody else.
+- **Deleting a channel**: kind `9008` with `["h", id]`, from any signed-in member. The channel,
+  its metadata and all its messages and reactions are removed, and the relay publishes a replacement
+  metadata event tagged `["deleted"]` so connected clients drop it live.
+- **Attachments**: `POST /files` with the file as the body and a NIP-98 `Authorization: Nostr ...`
+  header (kind `27235`, committing to the URL, method and the body's SHA-256). Up to 10 MB; the type
+  is detected from the bytes and must be PNG, JPEG, GIF, WebP, PDF, plain text or zip/Office.
+  Files are stored by hash and served at `GET /files/<sha256>.<ext>` with `nosniff`, a sandboxing
+  CSP, and as downloads except images. Messages reference them with NIP-92 `imeta` tags (at most 10).
+  Files are as public as messages (anyone with the link), and are not removed when a message or
+  channel is deleted.
 - Every event's ID and signature is verified before it's stored.
 
 ## Accounts (email + password)
@@ -86,6 +97,7 @@ automatically with `SEED_ON_START=true`.
 go run ./cmd/kpi -keygen          # once: KPI_AGENT_SECRET for .env, KPI_AGENT_PUBKEY for the relay
 go run ./cmd/kpi                  # review every channel marked for KPI insights and publish the report
 go run ./cmd/kpi -dry-run         # preview what would be sent, no API calls
+go run ./cmd/kpi -sample          # sample report from keyword rules: no AI, no API key (demos)
 go run ./cmd/kpi -provider claude # use Claude (ANTHROPIC_API_KEY) instead
 ```
 
@@ -98,10 +110,13 @@ Privacy rules, enforced in code before anything is sent to a model:
 How it works:
 1. Reads the channel from the relay and groups messages into whole conversations (a thread, or a
    run of messages with no gap over 45 minutes). A single message is never judged out of context.
-2. Sends conversations to the model in batches of 8 (`-batch`) and asks for contributions in four
-   pillars: technical leadership, knowledge sharing, industry intelligence, ownership & initiative.
+2. Sends conversations to the model in batches of 8 (`-batch`), with each participant's level, and
+   asks for contributions filed under one KPI item of the contributor's level. The framework
+   (levels, items, weights, what counts as evidence) is in `internal/kpi/framework.go`, a fictional
+   sample to replace with your own; each person's level comes from `-team` (default
+   `seed/team.json`, anyone unlisted is a Software Engineer).
 3. Validates every finding in code. It must cite messages the contributor actually wrote, and must
-   name a real participant, pillar, and impact level. People are told apart by public key, so an
+   name a real participant, an item of *their* level, and an impact level. People are told apart by public key, so an
    account that copies someone's display name is listed separately, as `Name (abc123)`.
 4. Writes one review per person from that person's evidence only: a headline, summary,
    evidence-linked highlights, and 1-on-1 questions. There is no score, and no weaknesses are
@@ -109,6 +124,9 @@ How it works:
 5. Publishes the team report to the relay, signed with the agent key, plus one report per person
    that holds only that person's evidence and review. The app shows them live: managers see
    everyone and open a review with `/kpi-<name>`; everyone else sees only their own.
+
+With `-sample`, keyword rules stand in for the model, so the dashboard can be demoed without an
+API key. Every item says which keyword matched, and the app marks the report as a sample.
 
 It is quota-friendly. The sample data takes about 5 requests plus one per person (about 12 in
 total). Results are cached in `.kpi-cache.json` (git-ignored), so re-runs only send new or changed

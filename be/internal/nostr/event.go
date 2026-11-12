@@ -23,6 +23,7 @@ const (
 	KindChatMessage   = 9     // NIP-29 group chat message
 	KindEditGroup     = 9002  // NIP-29 edit group metadata; turns KPI review on or off
 	KindCreateGroup   = 9007  // NIP-29 create group (channel)
+	KindDeleteGroup   = 9008  // NIP-29 delete group (channel); creator only
 	KindAuth          = 22242 // NIP-42 client authentication
 	KindAppData       = 30078 // NIP-78 app data; the KPI report and each person's opt-in
 	KindGroupMetadata = 39000 // NIP-29 group metadata, signed by the relay

@@ -19,7 +19,9 @@ type Report struct {
 	To            time.Time    `json:"to"`
 	Conversations int          `json:"conversations"`
 	Skipped       []string     `json:"skipped,omitempty"`
-	Pillars       []PillarInfo `json:"pillars"`
+	Framework     string       `json:"framework"`
+	Levels        []LevelInfo  `json:"levels"`
+	Pillars       []PillarInfo `json:"pillars"` // every KPI item of every level
 	Team          TeamSummary  `json:"team"`
 	People        []Person     `json:"people"`
 }
@@ -41,6 +43,7 @@ type MonthCounts struct {
 type Person struct {
 	Name     string         `json:"name"`
 	Pubkey   string         `json:"pubkey,omitempty"`
+	Level    string         `json:"level"`
 	Messages int            `json:"messages"`
 	Counts   map[Pillar]int `json:"counts"`
 	Impact   map[Impact]int `json:"impact"`
@@ -200,17 +203,26 @@ func BuildReport(units []Unit, evidence []Evidence, model string, channels []str
 		Channels:      channels,
 		Conversations: len(units),
 		Skipped:       skipped,
+		Framework:     FrameworkName,
+		Levels:        Levels,
 		Pillars:       Pillars,
 	}
 
 	// People are told apart by public key, so two accounts that share a
 	// display name are never merged.
 	people := map[string]*Person{}
+	// Each person's level comes from the units they took part in.
+	levels := map[string]string{}
+	for _, u := range units {
+		for name, l := range u.Levels {
+			levels[name] = l
+		}
+	}
 	person := func(name, pubkey string) *Person {
 		id := cmp.Or(pubkey, name)
 		p, ok := people[id]
 		if !ok {
-			p = &Person{Name: name, Pubkey: pubkey, Counts: zeroCounts(), Impact: map[Impact]int{ImpactLow: 0, ImpactMedium: 0, ImpactHigh: 0}}
+			p = &Person{Name: name, Pubkey: pubkey, Level: cmp.Or(levels[name], LevelEngineer), Counts: zeroCounts(), Impact: map[Impact]int{ImpactLow: 0, ImpactMedium: 0, ImpactHigh: 0}}
 			people[id] = p
 		}
 		return p

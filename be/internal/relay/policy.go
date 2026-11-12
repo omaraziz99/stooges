@@ -22,7 +22,18 @@ const (
 	oldDefaultChannelID = "general" // no longer created; see RemoveOldDefaultChannel
 	maxReportBytes      = 900 * 1024
 	maxConsentBytes     = 256
+	maxAttachments      = 10 // NIP-92 imeta tags per message
 )
+
+func countTags(ev *nostr.Event, name string) int {
+	n := 0
+	for _, t := range ev.Tags {
+		if len(t) > 0 && t[0] == name {
+			n++
+		}
+	}
+	return n
+}
 
 var channelIDPattern = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
 
@@ -72,6 +83,10 @@ func (r *Relay) handleEvent(ctx context.Context, c *client, ev *nostr.Event) {
 			reject(fmt.Sprintf("invalid: message is longer than %d characters", maxMessageChars))
 			return
 		}
+		if n := countTags(ev, "imeta"); n > maxAttachments {
+			reject(fmt.Sprintf("invalid: a message can have at most %d attachments", maxAttachments))
+			return
+		}
 		if err := r.requireChannel(ctx, ev); err != nil {
 			reject(err.Error())
 			return
@@ -119,6 +134,14 @@ func (r *Relay) handleEvent(ctx context.Context, c *client, ev *nostr.Event) {
 			return
 		}
 		extra = append(extra, meta)
+
+	case nostr.KindDeleteGroup:
+		tombstone, err := r.deleteChannel(ctx, ev)
+		if err != nil {
+			reject(err.Error())
+			return
+		}
+		extra = append(extra, tombstone)
 	case nostr.KindAppData:
 		_, isReport := reportOwner(ev)
 		switch {
@@ -236,6 +259,42 @@ func (r *Relay) editChannel(ctx context.Context, ev *nostr.Event) (*nostr.Event,
 		return nil, errors.New("error: could not update channel")
 	}
 	return r.saveChannelMetadata(ctx, g)
+}
+
+// deleteChannel handles a kind 9008 event: ["h", id]. Any signed-in member
+// may delete any channel (a team decision; NIP-29 would limit it to admins).
+// The channel, its metadata and every message and
+// reaction in it are removed, and a relay-signed metadata event with a
+// ["deleted"] tag replaces the old one, so connected clients drop it live.
+// The relay's clock orders it, so a client's wrong clock can't revive it.
+func (r *Relay) deleteChannel(ctx context.Context, ev *nostr.Event) (*nostr.Event, error) {
+	id := ev.TagValue("h")
+	g, ok, err := r.store.GetGroup(ctx, id)
+	if err != nil {
+		r.log.Error("channel lookup failed", "err", err)
+		return nil, errors.New("error: channel lookup failed")
+	}
+	if !ok {
+		return nil, fmt.Errorf("invalid: unknown channel %q", id)
+	}
+	n, err := r.store.DeleteGroup(ctx, id)
+	if err != nil {
+		r.log.Error("delete channel failed", "err", err)
+		return nil, errors.New("error: could not delete channel")
+	}
+	r.log.Info("channel deleted", "channel", id, "by", ev.PubKey, "creator", g.CreatedBy, "events", n)
+	tombstone := &nostr.Event{
+		CreatedAt: time.Now().Unix(),
+		Kind:      nostr.KindGroupMetadata,
+		Tags:      []nostr.Tag{{"d", id}, {"deleted"}},
+	}
+	if err := tombstone.Sign(r.key); err != nil {
+		return nil, err
+	}
+	if _, err := r.store.Save(ctx, tombstone); err != nil {
+		return nil, err
+	}
+	return tombstone, nil
 }
 
 // saveChannelMetadata signs and stores the kind 39000 event describing a

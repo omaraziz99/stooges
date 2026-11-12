@@ -124,7 +124,7 @@ func TestEvaluateAndReport(t *testing.T) {
 		t.Errorf("people without evidence get an empty list, not null")
 	}
 	data, err := json.Marshal(r)
-	if err != nil || !strings.Contains(string(data), `"technical_leadership":0`) {
+	if err != nil || !strings.Contains(string(data), `"se_problem_solving":0`) {
 		t.Errorf("report JSON should include zero counts for every pillar: %v", err)
 	}
 }

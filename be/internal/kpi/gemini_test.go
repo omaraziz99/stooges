@@ -41,7 +41,7 @@ func TestGeminiRequestAndParse(t *testing.T) {
 		gotPath = r.URL.String()
 		raw, _ := io.ReadAll(r.Body)
 		json.Unmarshal(raw, &gotBody)
-		io.WriteString(w, answer(`{"contributions":[{"contributor":"Alice","pillar":"ownership_initiative","summary":"s","impact":"high","evidence_refs":["m1"],"rationale":"r"}]}`))
+		io.WriteString(w, answer(`{"contributions":[{"contributor":"Alice","pillar":"se_accountability","summary":"s","impact":"high","evidence_refs":["m1"],"rationale":"r"}]}`))
 	})
 
 	u := &Unit{ID: "u", Kind: "thread", Channel: "proj", Messages: []Message{msg("1", "Alice", 0, "Release is on Friday")}}
@@ -63,7 +63,7 @@ func TestGeminiRequestAndParse(t *testing.T) {
 	if gotBody.GenerationConfig.ResponseMimeType != "application/json" || !strings.Contains(string(gotBody.GenerationConfig.ResponseJSONSchema), "contributions") {
 		t.Errorf("request should ask for JSON matching the findings schema")
 	}
-	if !strings.Contains(gotBody.SystemInstruction.Parts[0].Text, "glue work") {
+	if !strings.Contains(gotBody.SystemInstruction.Parts[0].Text, "KPI framework") {
 		t.Errorf("system prompt should be sent as systemInstruction")
 	}
 }

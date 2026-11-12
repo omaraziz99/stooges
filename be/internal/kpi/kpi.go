@@ -1,8 +1,9 @@
-// Package kpi turns team chat into an evidence log of "glue work": the
-// leadership, knowledge sharing, industry insight, and ownership that commit
-// counts and ticket metrics miss. It groups messages into conversations,
-// asks an evaluator (Claude) what each person visibly contributed, and builds
-// a report for 1-on-1s and appraisals.
+// Package kpi turns team chat into an evidence log against an engineering
+// KPI framework (see framework.go): the delivery, problem solving,
+// collaboration, and mentoring that commit counts and ticket metrics miss.
+// It groups messages into conversations, asks an evaluator (an AI model)
+// what each person visibly contributed to their level's KPI items, and
+// builds a report for 1-on-1s and appraisals.
 //
 // Design rules: it records positive, specific evidence only (never negative
 // judgments or personal matters), every item links back to the source
@@ -17,44 +18,8 @@ import (
 	"time"
 )
 
-// Pillar is one KPI category.
+// Pillar is the ID of one KPI item, such as "se_delivery".
 type Pillar string
-
-const (
-	TechnicalLeadership  Pillar = "technical_leadership"
-	KnowledgeSharing     Pillar = "knowledge_sharing"
-	IndustryIntelligence Pillar = "industry_intelligence"
-	OwnershipInitiative  Pillar = "ownership_initiative"
-)
-
-// PillarInfo describes a pillar for prompts and the dashboard.
-type PillarInfo struct {
-	ID          Pillar `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-// Pillars is the rubric, in display order.
-var Pillars = []PillarInfo{
-	{TechnicalLeadership, "Technical leadership",
-		"Leading a role or decision: diagnosing problems, answering hard questions, guiding design trade-offs, reviewing and correcting others' work, unblocking teammates."},
-	{KnowledgeSharing, "Knowledge sharing",
-		"Sharing sessions, demos, walkthroughs, written explanations, guidelines, or lessons learned that help others do their work."},
-	{IndustryIntelligence, "Industry intelligence",
-		"Sharing articles, blogs, news, or tools from outside the team, ideally with commentary on why they matter to this team's work."},
-	{OwnershipInitiative, "Ownership & initiative",
-		"Volunteering or stepping up to lead: driving deadlines, coordinating people or releases, following an issue through to closure, raising risks early."},
-}
-
-// ValidPillar reports whether p is one of the rubric pillars.
-func ValidPillar(p Pillar) bool {
-	for _, info := range Pillars {
-		if info.ID == p {
-			return true
-		}
-	}
-	return false
-}
 
 // Impact is how much a contribution moved the team forward.
 type Impact string
@@ -86,6 +51,9 @@ type Unit struct {
 	Kind     string    `json:"kind"` // "thread" or "conversation"
 	Channel  string    `json:"channel"`
 	Messages []Message `json:"-"`
+	// Levels maps each participant's name to their framework level. Nil
+	// means levels are unknown and any item is accepted.
+	Levels map[string]string `json:"-"`
 }
 
 // Participants returns the distinct authors in the unit, in order of appearance.
@@ -107,7 +75,17 @@ func Ref(i int) string { return fmt.Sprintf("m%d", i+1) }
 // Transcript renders the unit for the evaluator, one labelled message per block.
 func (u *Unit) Transcript() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Channel: #%s\nType: %s\n\n", u.Channel, u.Kind)
+	fmt.Fprintf(&b, "Channel: #%s\nType: %s\n", u.Channel, u.Kind)
+	if len(u.Levels) > 0 {
+		var parts []string
+		for _, name := range u.Participants() {
+			if l, ok := u.Levels[name]; ok {
+				parts = append(parts, fmt.Sprintf("%s = %s", name, l))
+			}
+		}
+		fmt.Fprintf(&b, "Levels: %s\n", strings.Join(parts, "; "))
+	}
+	b.WriteByte('\n')
 	for i, m := range u.Messages {
 		fmt.Fprintf(&b, "[%s] %s (%s)", Ref(i), m.Author, m.At.Format("2006-01-02 15:04"))
 		if i > 0 && u.Kind == "thread" {
@@ -227,7 +205,10 @@ func Validate(u *Unit, findings []Finding) ([]Evidence, []string) {
 			dropped = append(dropped, fmt.Sprintf("unknown contributor %q", f.Contributor))
 			continue
 		case !ValidPillar(f.Pillar):
-			dropped = append(dropped, fmt.Sprintf("unknown pillar %q", f.Pillar))
+			dropped = append(dropped, fmt.Sprintf("unknown KPI item %q", f.Pillar))
+			continue
+		case u.Levels != nil && itemLevel(f.Pillar) != u.Levels[f.Contributor]:
+			dropped = append(dropped, fmt.Sprintf("%s: %q is not a KPI item of their level", f.Contributor, f.Pillar))
 			continue
 		case f.Impact != ImpactLow && f.Impact != ImpactMedium && f.Impact != ImpactHigh:
 			dropped = append(dropped, fmt.Sprintf("unknown impact %q", f.Impact))
@@ -286,4 +267,9 @@ func truncate(s string, n int) string {
 		return string(r)
 	}
 	return strings.TrimSpace(string(r[:n])) + "…"
+}
+
+func itemLevel(id Pillar) string {
+	info, _ := ItemInfo(id)
+	return info.Level
 }

@@ -1,0 +1,13 @@
+{
+  "_note": "Fictional demo team. Each person's level in the KPI framework (be/internal/kpi/framework.go): se = Software Engineer (C3), sse = Senior Software Engineer (C2). Anyone not listed uses default_level.",
+  "default_level": "se",
+  "people": {
+    "Maya Chen": "se",
+    "Sara Lim": "se",
+    "Nora Ahmad": "se",
+    "Ben Ortiz": "se",
+    "Leo Tan": "sse",
+    "Ravi Kumar": "sse",
+    "Priya Nair": "sse"
+  }
+}

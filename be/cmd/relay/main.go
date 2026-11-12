@@ -8,6 +8,7 @@
 //	KPI_AGENT_PUBKEY  the KPI agent's public key; only it may publish reports.
 //	                  Locally, KPI_AGENT_SECRET in .env works too.
 //	ALLOWED_ORIGINS   comma-separated web origins allowed to connect (default: any)
+//	FILES_DIR         where chat attachments are stored (default: "files" next to DB_PATH)
 package main
 
 import (
@@ -18,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -26,6 +28,7 @@ import (
 
 	"stooges/be/internal/accounts"
 	"stooges/be/internal/config"
+	"stooges/be/internal/files"
 	"stooges/be/internal/nostr"
 	"stooges/be/internal/relay"
 	"stooges/be/internal/store"
@@ -71,9 +74,18 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	// /api/* is email sign-up and log-in; everything else is the relay.
+	filesDir := envOr("FILES_DIR", filepath.Join(filepath.Dir(dbPath), "files"))
+	fileHandler, err := files.New(filesDir, log, opts.AllowedOrigins)
+	if err != nil {
+		return err
+	}
+
+	// /api/* is email sign-up and log-in, /files is attachments; everything
+	// else is the relay.
 	mux := http.NewServeMux()
 	mux.Handle("/api/", accounts.New(st, log, opts.AllowedOrigins))
+	mux.Handle("/files", fileHandler)
+	mux.Handle("/files/", fileHandler)
 	mux.Handle("/", r)
 
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
@@ -84,7 +96,7 @@ func run(log *slog.Logger) error {
 		srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Info("relay listening", "addr", addr, "db", dbPath, "relay_pubkey", r.PubKey())
+	log.Info("relay listening", "addr", addr, "db", dbPath, "files", filesDir, "relay_pubkey", r.PubKey())
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

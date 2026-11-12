@@ -2,7 +2,6 @@ package kpi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -167,12 +166,15 @@ func WriteReviews(ctx context.Context, rw Reviewer, r *Report, opt ReviewOptions
 // ReviewSystemPrompt sets the rules for written reviews.
 func ReviewSystemPrompt() string {
 	var b strings.Builder
-	b.WriteString(`You draft KPI review notes that a manager reads before a 1-on-1 with an engineer. You receive only the evidence log for one person: contributions that were found in team chat and checked against the original messages. Each item is numbered [1], [2], and so on, with its KPI pillar, impact level, date, a summary, and a quote.
+	b.WriteString(`You draft KPI review notes that a manager reads before a 1-on-1 with an engineer. You receive only the evidence log for one person: contributions that were found in team chat and checked against the original messages. Each item is numbered [1], [2], and so on, with its KPI item, impact level, date, a summary, and a quote. You are also told the person's level; their KPI items are weighted, so the items with more weight matter more to their review.
 
-The KPI pillars:
+The KPI items, by level:
 `)
-	for _, p := range Pillars {
-		fmt.Fprintf(&b, "- %s (%s): %s\n", p.ID, p.Name, p.Description)
+	for _, l := range Levels {
+		fmt.Fprintf(&b, "\nLevel %s, %s:\n", l.ID, l.Title)
+		for _, p := range ItemsFor(l.ID) {
+			fmt.Fprintf(&b, "- %s (%s, %d%%): %s\n", p.ID, p.Name, p.Weight, p.KPI)
+		}
 	}
 	b.WriteString(`
 Rules:
@@ -185,15 +187,21 @@ Rules:
 Write:
 - headline: one line of at most 15 words naming the clearest pattern in their contributions.
 - summary: 2 to 4 sentences describing what the evidence shows, with the most significant contributions first.
-- highlights: up to 4 strengths. Each names a pillar, says what they did in one sentence, and lists the evidence numbers that show it, such as [1, 3].
+- highlights: up to 4 strengths. Each names a KPI item of the person's level (its ID), says what they did in one sentence, and lists the evidence numbers that show it, such as [1, 3].
 - discussion_points: 2 to 4 open questions the manager could ask in the 1-on-1, grounded in the evidence. For example, ask what support would help them keep doing something, or whether they want more of a kind of work.`)
 	return b.String()
 }
 
 func reviewUserPrompt(p *Person, from, to time.Time) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Person: %s\nPeriod: %s to %s\nMessages written in reviewed channels: %d\n\nEvidence:\n",
-		p.Name, from.Format("2006-01-02"), to.Format("2006-01-02"), p.Messages)
+	level := p.Level
+	for _, l := range Levels {
+		if l.ID == p.Level {
+			level = fmt.Sprintf("%s (%s)", l.ID, l.Title)
+		}
+	}
+	fmt.Fprintf(&b, "Person: %s\nLevel: %s\nPeriod: %s to %s\nMessages written in reviewed channels: %d\n\nEvidence:\n",
+		p.Name, level, from.Format("2006-01-02"), to.Format("2006-01-02"), p.Messages)
 	for i, e := range p.Evidence {
 		fmt.Fprintf(&b, "\n[%d] %s, %s impact, %s, #%s", i+1, e.Pillar, e.Impact, e.At.Format("2006-01-02"), e.Channel)
 		if e.Endorsements > 0 {
@@ -204,26 +212,26 @@ func reviewUserPrompt(p *Person, from, to time.Time) string {
 	return b.String()
 }
 
-var reviewSchema = json.RawMessage(`{
-  "type": "object",
-  "properties": {
-    "headline": {"type": "string"},
-    "summary":  {"type": "string"},
-    "highlights": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "pillar":   {"type": "string", "enum": ["technical_leadership", "knowledge_sharing", "industry_intelligence", "ownership_initiative"]},
-          "text":     {"type": "string"},
-          "evidence": {"type": "array", "items": {"type": "integer"}}
-        },
-        "required": ["pillar", "text", "evidence"],
-        "additionalProperties": false
-      }
-    },
-    "discussion_points": {"type": "array", "items": {"type": "string"}}
-  },
-  "required": ["headline", "summary", "highlights", "discussion_points"],
-  "additionalProperties": false
-}`)
+var reviewSchema = mustJSON(map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"headline": map[string]any{"type": "string"},
+		"summary":  map[string]any{"type": "string"},
+		"highlights": map[string]any{
+			"type": "array",
+			"items": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"pillar":   map[string]any{"type": "string", "enum": itemIDs()},
+					"text":     map[string]any{"type": "string"},
+					"evidence": map[string]any{"type": "array", "items": map[string]any{"type": "integer"}},
+				},
+				"required":             []string{"pillar", "text", "evidence"},
+				"additionalProperties": false,
+			},
+		},
+		"discussion_points": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+	},
+	"required":             []string{"headline", "summary", "highlights", "discussion_points"},
+	"additionalProperties": false,
+})

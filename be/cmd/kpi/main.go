@@ -1,13 +1,15 @@
 // Command kpi reads team channels from the relay, asks an AI model what each
-// person visibly contributed (leadership, knowledge sharing, industry
-// intelligence, ownership), drafts a review per person, and publishes the
-// report to the relay for the dashboard and the /kpi-<name> command.
+// person visibly contributed to their level's KPI items (be/internal/kpi/
+// framework.go), drafts a review per person, and publishes the report to the
+// relay for the dashboard and the /kpi-<name> command.
 //
 //	go run ./cmd/kpi -keygen                     # once: create the agent identity
 //	go run ./cmd/kpi                             # review every channel marked for KPI insights, with Gemini
 //	go run ./cmd/kpi -channel project-orbit      # only this channel
 //	go run ./cmd/kpi -provider claude
 //	go run ./cmd/kpi -dry-run                    # preview what would be sent, no API calls
+//	go run ./cmd/kpi -sample                     # demo report from keyword rules: no AI, no API key
+//	go run ./cmd/kpi -team seed/team.json        # each person's level (default file shown)
 //	go run ./cmd/kpi -relay wss://your-relay.up.railway.app
 //
 // Settings come from the environment or .env:
@@ -46,6 +48,8 @@ func main() {
 	cachePath := flag.String("cache", ".kpi-cache.json", `result cache so re-runs only send new conversations ("" to disable)`)
 	dryRun := flag.Bool("dry-run", false, "show the conversations that would be sent, without calling the model")
 	keygen := flag.Bool("keygen", false, "print a new agent key pair and exit")
+	sample := flag.Bool("sample", false, "build a sample report from keyword rules instead of an AI model (for demos; no API key needed)")
+	teamPath := flag.String("team", "seed/team.json", "JSON file with each person's KPI level")
 	envFile := flag.String("env", ".env", "file with settings (environment variables take priority)")
 	flag.Parse()
 
@@ -65,27 +69,38 @@ func main() {
 		}
 	}
 
+	team, err := kpi.LoadTeam(*teamPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var agent kpi.Agent
-	switch *provider {
-	case "gemini":
-		modelName := firstNonEmpty(*model, os.Getenv("GEMINI_MODEL"), kpi.DefaultGeminiModel)
-		key := os.Getenv("GEMINI_API_KEY")
-		if key == "" && !*dryRun {
-			log.Fatalf("no Gemini API key: set GEMINI_API_KEY (in %s or the environment), or use -dry-run", *envFile)
-		}
-		agent = kpi.NewGemini(key, modelName)
-	case "claude":
-		if !*dryRun && os.Getenv("ANTHROPIC_API_KEY") == "" && os.Getenv("ANTHROPIC_AUTH_TOKEN") == "" {
-			log.Fatalf("no Claude API key: set ANTHROPIC_API_KEY (in %s or the environment), or use -dry-run", *envFile)
-		}
-		agent = kpi.NewClaude(firstNonEmpty(*model, kpi.DefaultModel))
+	switch {
+	case *sample:
+		agent = kpi.SampleAgent{}
+		*cachePath = "" // instant, and keeps sample results out of the AI cache
 	default:
-		log.Fatalf(`unknown -provider %q: use "gemini" or "claude"`, *provider)
+		switch *provider {
+		case "gemini":
+			modelName := firstNonEmpty(*model, os.Getenv("GEMINI_MODEL"), kpi.DefaultGeminiModel)
+			key := os.Getenv("GEMINI_API_KEY")
+			if key == "" && !*dryRun {
+				log.Fatalf("no Gemini API key: set GEMINI_API_KEY (in %s or the environment), or use -dry-run", *envFile)
+			}
+			agent = kpi.NewGemini(key, modelName)
+		case "claude":
+			if !*dryRun && os.Getenv("ANTHROPIC_API_KEY") == "" && os.Getenv("ANTHROPIC_AUTH_TOKEN") == "" {
+				log.Fatalf("no Claude API key: set ANTHROPIC_API_KEY (in %s or the environment), or use -dry-run", *envFile)
+			}
+			agent = kpi.NewClaude(firstNonEmpty(*model, kpi.DefaultModel))
+		default:
+			log.Fatalf(`unknown -provider %q: use "gemini" or "claude"`, *provider)
+		}
 	}
 
 	opts := options{
 		relayURL: *relayURL, channels: splitList(*channels), out: *out, cachePath: *cachePath,
-		batch: *batch, parallel: *parallel, dryRun: *dryRun, agentKey: agentKey,
+		batch: *batch, parallel: *parallel, dryRun: *dryRun, agentKey: agentKey, team: team,
 	}
 	if err := run(agent, opts); err != nil {
 		log.Fatal(err)
@@ -135,6 +150,7 @@ type options struct {
 	parallel  int
 	dryRun    bool
 	agentKey  *btcec.PrivateKey
+	team      kpi.Team
 }
 
 func run(agent kpi.Agent, opts options) error {
@@ -158,6 +174,7 @@ func run(agent kpi.Agent, opts options) error {
 		fmt.Printf("#%s: %d conversations\n", ch, len(u))
 		units = append(units, u...)
 	}
+	kpi.AssignLevels(units, opts.team)
 	if len(units) == 0 {
 		return fmt.Errorf("nothing to review: no one who has opted in to KPI insights has posted in these channels (the sample data opts its users in: go run ./cmd/seed)")
 	}

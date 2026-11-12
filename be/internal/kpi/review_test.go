@@ -73,7 +73,7 @@ func TestReviewPromptUsesOnlyEvidence(t *testing.T) {
 		Summary: "Set the release plan.", Quote: "Code freeze 10 Oct, launch 24 Oct", Endorsements: 2,
 	}}}
 	prompt := reviewUserPrompt(p, t0, t0.AddDate(0, 3, 0))
-	for _, want := range []string{"Maya Chen", "[1] ownership_initiative, high impact", "2 teammate reactions", "Code freeze 10 Oct"} {
+	for _, want := range []string{"Maya Chen", "[1] se_accountability, high impact", "2 teammate reactions", "Code freeze 10 Oct"} {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("prompt missing %q:\n%s", want, prompt)
 		}
