@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +24,8 @@ const (
 	maxReportBytes      = 900 * 1024
 	maxConsentBytes     = 256
 	maxAttachments      = 10 // NIP-92 imeta tags per message
+	maxBookingTitle     = 120
+	maxBookingNote      = 2000
 )
 
 func countTags(ev *nostr.Event, name string) int {
@@ -35,7 +38,10 @@ func countTags(ev *nostr.Event, name string) int {
 	return n
 }
 
-var channelIDPattern = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
+var (
+	channelIDPattern = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
+	pubkeyPattern    = regexp.MustCompile(`^[0-9a-f]{64}$`)
+)
 
 // handleEvent validates an EVENT against the platform rules, stores it, and
 // broadcasts it. Every path answers with an OK message (NIP-01).
@@ -55,7 +61,7 @@ func (r *Relay) handleEvent(ctx context.Context, c *client, ev *nostr.Event) {
 	}
 
 	c.mu.Lock()
-	authed := c.pubkey
+	authed, manager := c.pubkey, c.manager
 	c.mu.Unlock()
 	if authed == "" {
 		reject("auth-required: sign in before publishing")
@@ -142,8 +148,14 @@ func (r *Relay) handleEvent(ctx context.Context, c *client, ev *nostr.Event) {
 			return
 		}
 		extra = append(extra, tombstone)
+	case nostr.KindCalendarEvent:
+		if err := checkBooking(ev, manager); err != nil {
+			reject(err.Error())
+			return
+		}
+
 	case nostr.KindAppData:
-		_, isReport := reportOwner(ev)
+		_, isReport := privateTo(ev)
 		switch {
 		case isReport:
 			if r.kpiPublisher == "" || ev.PubKey != r.kpiPublisher {
@@ -185,6 +197,35 @@ func (r *Relay) handleEvent(ctx context.Context, c *client, ev *nostr.Event) {
 	for _, e := range extra {
 		r.broadcast(e)
 	}
+}
+
+// checkBooking validates a performance review booking: a NIP-52 time-based
+// calendar event (kind 31923) that only managers may publish, for exactly one
+// person (its p tag), with a start time and an optional end. A
+// ["status", "cancelled"] tag on a later version cancels it.
+func checkBooking(ev *nostr.Event, manager bool) error {
+	if !manager {
+		return errors.New("restricted: only managers can book performance reviews")
+	}
+	if d := ev.TagValue("d"); d == "" || len(d) > 64 {
+		return errors.New("invalid: a booking needs a d tag of at most 64 characters")
+	}
+	if p := ev.TagValues("p"); len(p) != 1 || !pubkeyPattern.MatchString(p[0]) {
+		return errors.New("invalid: a booking needs exactly one p tag, the person's public key")
+	}
+	start, err := strconv.ParseInt(ev.TagValue("start"), 10, 64)
+	if err != nil || start <= 0 {
+		return errors.New("invalid: a booking needs a start time in seconds")
+	}
+	if end := ev.TagValue("end"); end != "" {
+		if e, err := strconv.ParseInt(end, 10, 64); err != nil || e <= start {
+			return errors.New("invalid: a booking must end after it starts")
+		}
+	}
+	if len([]rune(ev.TagValue("title"))) > maxBookingTitle || len([]rune(ev.Content)) > maxBookingNote {
+		return errors.New("invalid: booking title or note is too long")
+	}
+	return nil
 }
 
 // requireChannel checks the event's h tag names an existing channel.

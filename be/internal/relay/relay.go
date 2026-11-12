@@ -249,37 +249,51 @@ func (r *Relay) handleReq(ctx context.Context, c *client, args []json.RawMessage
 	c.reply(encode("EOSE", subID))
 }
 
-// reportOwner says whether ev is a KPI report and, for a personal one, whose.
-func reportOwner(ev *nostr.Event) (owner string, isReport bool) {
-	if ev.Kind != nostr.KindAppData {
-		return "", false
+// privateKinds hold the only events that are not public (see privateTo).
+var privateKinds = []int{nostr.KindAppData, nostr.KindCalendarEvent}
+
+// privateTo says whether ev is private and, if so, whose: KPI reports and
+// performance review bookings. A personal report belongs to the person in its
+// d tag (the team report to nobody), a booking to the person it books.
+func privateTo(ev *nostr.Event) (owner string, private bool) {
+	switch ev.Kind {
+	case nostr.KindAppData:
+		d := ev.TagValue("d")
+		owner, personal := strings.CutPrefix(d, nostr.KPIReportTag+":")
+		if !personal {
+			owner = ""
+		}
+		return owner, personal || d == nostr.KPIReportTag
+	case nostr.KindCalendarEvent:
+		return ev.TagValue("p"), true
 	}
-	d := ev.TagValue("d")
-	owner, personal := strings.CutPrefix(d, nostr.KPIReportTag+":")
-	if !personal {
-		owner = ""
-	}
-	return owner, personal || d == nostr.KPIReportTag
+	return "", false
 }
 
 // canRead reports whether this connection may be sent ev. Everything is
-// public except KPI reports: managers and the agent read all of them, anyone
-// else only their own, and nobody before signing in.
+// public except KPI reports and review bookings: managers read all of them,
+// anyone else only their own (and the agent every report), and nobody before
+// signing in.
 func (r *Relay) canRead(c *client, ev *nostr.Event) bool {
-	owner, isReport := reportOwner(ev)
-	if !isReport {
+	owner, private := privateTo(ev)
+	if !private {
 		return true
 	}
 	c.mu.Lock()
 	pubkey, manager := c.pubkey, c.manager
 	c.mu.Unlock()
-	return pubkey != "" && (manager || pubkey == r.kpiPublisher || pubkey == owner)
+	if pubkey == "" {
+		return false
+	}
+	agent := ev.Kind == nostr.KindAppData && pubkey == r.kpiPublisher
+	return manager || agent || pubkey == owner || pubkey == ev.PubKey
 }
 
-// sendReports delivers stored KPI reports to subscriptions opened before
-// login. Web clients subscribe as soon as the socket opens, so without this
-// they would see no report until the agent next published one.
-func (r *Relay) sendReports(ctx context.Context, c *client) {
+// sendPrivate delivers stored private events (reports and bookings) to
+// subscriptions opened before login, which skipped them. Web clients
+// subscribe as soon as the socket opens, so without this they would see none
+// until the next one was published.
+func (r *Relay) sendPrivate(ctx context.Context, c *client) {
 	c.mu.Lock()
 	subs := make(map[string][]nostr.Filter, len(c.subs))
 	for id, filters := range c.subs {
@@ -289,22 +303,25 @@ func (r *Relay) sendReports(ctx context.Context, c *client) {
 	for id, filters := range subs {
 		seen := map[string]bool{}
 		for _, f := range filters {
-			if len(f.Kinds) > 0 && !slices.Contains(f.Kinds, nostr.KindAppData) {
-				continue
-			}
-			f.Kinds = []int{nostr.KindAppData}
-			events, err := r.store.Query(ctx, f)
-			if err != nil {
-				r.log.Error("report query failed", "err", err)
-				continue
-			}
-			for i := range events {
-				// Only reports were held back; everything else was already sent.
-				if _, isReport := reportOwner(&events[i]); !isReport || seen[events[i].ID] || !r.canRead(c, &events[i]) {
+			for _, kind := range privateKinds {
+				if len(f.Kinds) > 0 && !slices.Contains(f.Kinds, kind) {
 					continue
 				}
-				seen[events[i].ID] = true
-				c.reply(encode("EVENT", id, &events[i]))
+				q := f
+				q.Kinds = []int{kind}
+				events, err := r.store.Query(ctx, q)
+				if err != nil {
+					r.log.Error("private event query failed", "err", err)
+					continue
+				}
+				for i := range events {
+					// Only private events were held back; everything else was already sent.
+					if _, private := privateTo(&events[i]); !private || seen[events[i].ID] || !r.canRead(c, &events[i]) {
+						continue
+					}
+					seen[events[i].ID] = true
+					c.reply(encode("EVENT", id, &events[i]))
+				}
 			}
 		}
 	}
@@ -340,7 +357,7 @@ func (r *Relay) handleAuth(ctx context.Context, c *client, ev *nostr.Event) {
 	c.mu.Unlock()
 	c.reply(encode("OK", ev.ID, true, ""))
 	if first {
-		r.sendReports(ctx, c)
+		r.sendPrivate(ctx, c)
 	}
 }
 

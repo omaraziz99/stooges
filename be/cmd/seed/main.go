@@ -2,7 +2,8 @@
 // Each dummy user signs in over WebSocket like a real client, so the data goes
 // through the same validation as the app. Keys are derived from user names,
 // so re-running the seed creates no duplicates. It also creates the demo email
-// accounts (see demo_accounts in the seed file) in the relay's database.
+// accounts (see demo_accounts in the seed file) in the relay's database, and
+// the performance reviews the demo manager has booked (see reviews).
 //
 //	go run ./cmd/seed                                        # seed/demo.json -> ws://localhost:7777, accounts in stooges.db
 //	go run ./cmd/seed -relay ws://localhost:7777 -db /path/to/stooges.db
@@ -19,6 +20,7 @@ import (
 	"os"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,12 +61,27 @@ type demoAccount struct {
 	Role     string `json:"role"` // employee or manager
 }
 
+// review is a performance review a manager has booked, days from the day the
+// seed runs (negative: in the past), so the dashboard's suggestions stay
+// meaningful whenever the demo is started.
+type review struct {
+	By          string `json:"by"` // a manager in demo_accounts
+	Person      string `json:"person"`
+	DaysFromNow int    `json:"days_from_now"`
+	Note        string `json:"note,omitempty"`
+}
+
 type seedFile struct {
 	Users []string `json:"users"`
 	// DemoAccounts are email logins for seeded users, to show the app with.
 	DemoAccounts []demoAccount `json:"demo_accounts"`
 	Channels     []channel     `json:"channels"`
+	Reviews      []review      `json:"reviews"`
 }
+
+// demoZone is the time zone of the demo data (its messages are at +08:00);
+// seeded reviews start at 10:00 there.
+var demoZone = time.FixedZone("+08:00", 8*60*60)
 
 func main() {
 	file := flag.String("file", "seed/demo.json", "seed data file")
@@ -104,6 +121,13 @@ func run(path, relayURL, dbPath string) error {
 		}
 	}
 
+	// Accounts first: the relay decides at sign-in whether someone is a
+	// manager, and only managers may book reviews.
+	haveAccounts, err := seedAccounts(seed.DemoAccounts, dbPath)
+	if err != nil {
+		return err
+	}
+
 	// Sign every user in.
 	users := map[string]*client.Conn{}
 	for _, name := range seed.Users {
@@ -136,38 +160,77 @@ func run(path, relayURL, dbPath string) error {
 		}
 	}
 
+	if haveAccounts {
+		if err := seedReviews(seed.Reviews, users, &stats); err != nil {
+			return err
+		}
+	} else if len(seed.Reviews) > 0 {
+		fmt.Println("Skipped review bookings: they need the demo manager's account (see -db).")
+	}
+
 	fmt.Printf("done: %d new events, %d already there, %d users, %d channels\n",
 		stats.added, stats.duplicates, len(seed.Users), len(seed.Channels))
-
-	return seedAccounts(seed.DemoAccounts, dbPath)
+	return nil
 }
 
-// seedAccounts creates the demo email accounts. Accounts live in the relay's
-// database rather than in events, so this writes to it directly; it must be
-// the same file the relay uses.
-func seedAccounts(accts []demoAccount, dbPath string) error {
+// seedReviews books the demo performance reviews as their manager: NIP-52
+// calendar events (kind 31923) for one person each, from 10:00 for an hour.
+// A booking that is already there is left alone, so changes made in the app
+// survive a re-seed.
+func seedReviews(reviews []review, users map[string]*client.Conn, stats *counter) error {
+	for _, rv := range reviews {
+		d := "seed-review-" + strings.ToLower(strings.ReplaceAll(rv.Person, " ", "-"))
+		existing, err := users[rv.By].Query("review", map[string]any{
+			"kinds": []int{nostr.KindCalendarEvent}, "authors": []string{nostr.PubKeyHex(keyFor(rv.By))}, "#d": []string{d},
+		})
+		if err != nil {
+			return err
+		}
+		if len(existing) > 0 {
+			stats.duplicates++
+			continue
+		}
+		day := time.Now().In(demoZone).AddDate(0, 0, rv.DaysFromNow)
+		start := time.Date(day.Year(), day.Month(), day.Day(), 10, 0, 0, 0, demoZone)
+		_, ok, reason, err := users[rv.By].Publish(nostr.KindCalendarEvent, time.Now(), rv.Note,
+			nostr.Tag{"d", d},
+			nostr.Tag{"p", nostr.PubKeyHex(keyFor(rv.Person))},
+			nostr.Tag{"title", "Performance review: " + rv.Person},
+			nostr.Tag{"start", strconv.FormatInt(start.Unix(), 10)},
+			nostr.Tag{"end", strconv.FormatInt(start.Add(time.Hour).Unix(), 10)},
+		)
+		stats.add(ok, reason, err)
+	}
+	return nil
+}
+
+// seedAccounts creates the demo email accounts, and reports whether it did.
+// Accounts live in the relay's database rather than in events, so this writes
+// to it directly; it must be the same file the relay uses.
+func seedAccounts(accts []demoAccount, dbPath string) (bool, error) {
 	if len(accts) == 0 {
-		return nil
+		return false, nil
 	}
 	if _, err := os.Stat(dbPath); err != nil {
-		fmt.Printf("\nSkipped demo accounts: no relay database at %s (pass -db with the relay's DB_PATH).\n", dbPath)
-		return nil
+		fmt.Printf("Skipped demo accounts: no relay database at %s (pass -db with the relay's DB_PATH).\n", dbPath)
+		return false, nil
 	}
 	st, err := store.Open(dbPath)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer st.Close()
 
 	fmt.Println("\nDemo accounts (fictional; log in with email and password):")
 	for _, a := range accts {
 		if _, err := accounts.Provision(context.Background(), st, a.Email, a.Password, keyFor(a.Name), a.Role); err != nil {
-			return fmt.Errorf("demo account %s: %w", a.Email, err)
+			return false, fmt.Errorf("demo account %s: %w", a.Email, err)
 		}
 		fmt.Printf("  %-8s  %-12s  %-20s  %s\n", a.Role, a.Name, a.Email, a.Password)
 	}
 	fmt.Println("Managers see everyone's KPI report; employees see only their own.")
-	return nil
+	fmt.Println()
+	return true, nil
 }
 
 // seedChannel creates one channel, as the author of its first message, and posts its history.
@@ -244,6 +307,12 @@ func validate(s *seedFile) error {
 		}
 		if a.Role != store.RoleEmployee && a.Role != store.RoleManager {
 			return fmt.Errorf("demo account %q: role must be %q or %q", a.Name, store.RoleEmployee, store.RoleManager)
+		}
+	}
+	for _, rv := range s.Reviews {
+		manager := slices.ContainsFunc(s.DemoAccounts, func(a demoAccount) bool { return a.Name == rv.By && a.Role == store.RoleManager })
+		if !manager || !slices.Contains(s.Users, rv.Person) {
+			return fmt.Errorf("review of %q by %q: the person must be in users and the booker a manager in demo_accounts", rv.Person, rv.By)
 		}
 	}
 	var check func(m message) error

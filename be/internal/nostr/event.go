@@ -26,6 +26,7 @@ const (
 	KindDeleteGroup   = 9008  // NIP-29 delete group (channel); creator only
 	KindAuth          = 22242 // NIP-42 client authentication
 	KindAppData       = 30078 // NIP-78 app data; the KPI report and each person's opt-in
+	KindCalendarEvent = 31923 // NIP-52 time-based calendar event: a manager's performance review booking
 	KindGroupMetadata = 39000 // NIP-29 group metadata, signed by the relay
 )
 

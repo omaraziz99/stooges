@@ -7,7 +7,9 @@
     "Ravi Kumar",
     "Nora Ahmad",
     "Ben Ortiz",
-    "Priya Nair"
+    "Priya Nair",
+    "Hana Yusof",
+    "Daniel Wong"
   ],
   "demo_accounts": [
     { "name": "Maya Chen", "email": "maya@example.com", "password": "orbit-demo-2026", "role": "employee" },
@@ -344,6 +346,16 @@
           "author": "Nora Ahmad",
           "at": "2026-11-05T13:12:00+08:00",
           "text": "Booked, room 4 at 2pm."
+        },
+        {
+          "author": "Hana Yusof",
+          "at": "2026-10-06T09:12:00+08:00",
+          "text": "Morning! Is the design crit still at 3pm today?"
+        },
+        {
+          "author": "Daniel Wong",
+          "at": "2026-10-15T17:40:00+08:00",
+          "text": "Running a bit late tomorrow, start without me."
         }
       ]
     },
@@ -521,6 +533,11 @@
               "text": "yep, same"
             }
           ]
+        },
+        {
+          "author": "Daniel Wong",
+          "at": "2026-10-28T11:20:00+08:00",
+          "text": "Which room are we in for Thursday's sync?"
         }
       ]
     },
@@ -633,6 +650,11 @@
               "text": "Happy to. I'll set it up for next Tuesday."
             }
           ]
+        },
+        {
+          "author": "Hana Yusof",
+          "at": "2026-10-21T14:05:00+08:00",
+          "text": "Thanks Sara, that link works now 🙌"
         }
       ]
     },
@@ -748,5 +770,13 @@
         }
       ]
     }
+  ],
+  "reviews": [
+    { "by": "Priya Nair", "person": "Maya Chen", "days_from_now": -40 },
+    { "by": "Priya Nair", "person": "Ravi Kumar", "days_from_now": -60 },
+    { "by": "Priya Nair", "person": "Daniel Wong", "days_from_now": -30 },
+    { "by": "Priya Nair", "person": "Nora Ahmad", "days_from_now": -100 },
+    { "by": "Priya Nair", "person": "Leo Tan", "days_from_now": -150 },
+    { "by": "Priya Nair", "person": "Sara Lim", "days_from_now": 6, "note": "Q4 review. Bring two pieces of work you're proud of and one area you'd like to grow in." }
   ]
 }
