@@ -22,6 +22,6 @@ until wget -q -O /dev/null "http://127.0.0.1:$port/" 2>/dev/null; do
 	fi
 	sleep 0.1
 done
-seed -file /app/seed/demo.json -relay "ws://127.0.0.1:$port" || echo "seed failed" >&2
+seed -file /app/seed/demo.json -relay "ws://127.0.0.1:$port" -db "$DB_PATH" || echo "seed failed" >&2
 
 wait "$pid"

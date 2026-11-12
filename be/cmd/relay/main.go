@@ -7,8 +7,6 @@
 //	DB_PATH           SQLite file (default "stooges.db"; use a volume in production)
 //	KPI_AGENT_PUBKEY  the KPI agent's public key; only it may publish reports.
 //	                  Locally, KPI_AGENT_SECRET in .env works too.
-//	MANAGER_PUBKEYS   comma-separated hex public keys that may read everyone's KPI
-//	                  report; everyone else reads only their own
 //	ALLOWED_ORIGINS   comma-separated web origins allowed to connect (default: any)
 package main
 
@@ -66,11 +64,10 @@ func run(log *slog.Logger) error {
 
 	opts := relay.Options{
 		KPIPublisher:   kpiPublisher(log),
-		Managers:       managers(log),
 		AllowedOrigins: splitList(os.Getenv("ALLOWED_ORIGINS")),
 	}
 	r := relay.New(st, key, log, opts)
-	if err := r.EnsureDefaultChannel(ctx); err != nil {
+	if err := r.RemoveOldDefaultChannel(ctx); err != nil {
 		return err
 	}
 
@@ -130,25 +127,6 @@ func kpiPublisher(log *slog.Logger) string {
 	}
 	log.Warn("KPI reports disabled: set KPI_AGENT_PUBKEY (see `go run ./cmd/kpi -keygen`)")
 	return ""
-}
-
-// managers reads MANAGER_PUBKEYS, skipping entries that are not public keys.
-func managers(log *slog.Logger) []string {
-	var out []string
-	for _, m := range splitList(os.Getenv("MANAGER_PUBKEYS")) {
-		m = strings.ToLower(m)
-		if b, err := hex.DecodeString(m); err != nil || len(b) != 32 {
-			log.Warn("ignoring MANAGER_PUBKEYS entry: expected 64 hex characters", "entry", m)
-			continue
-		}
-		out = append(out, m)
-	}
-	if len(out) == 0 {
-		log.Warn("no managers set: people can read their own KPI report, but nobody can read the team's (set MANAGER_PUBKEYS)")
-	} else {
-		log.Info("managers can read every KPI report; everyone else only their own", "managers", len(out))
-	}
-	return out
 }
 
 func splitList(s string) []string {

@@ -1,15 +1,17 @@
 // Command seed loads sample channels and conversations into a running relay.
 // Each dummy user signs in over WebSocket like a real client, so the data goes
 // through the same validation as the app. Keys are derived from user names,
-// so re-running the seed creates no duplicates.
+// so re-running the seed creates no duplicates. It also creates the demo email
+// accounts (see demo_accounts in the seed file) in the relay's database.
 //
-//	go run ./cmd/seed                                        # seed/demo.json -> ws://localhost:7777
-//	go run ./cmd/seed -relay wss://your-relay.up.railway.app
+//	go run ./cmd/seed                                        # seed/demo.json -> ws://localhost:7777, accounts in stooges.db
+//	go run ./cmd/seed -relay ws://localhost:7777 -db /path/to/stooges.db
 package main
 
 import (
+	"cmp"
+	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -22,8 +24,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 
+	"stooges/be/internal/accounts"
 	"stooges/be/internal/client"
+	"stooges/be/internal/config"
 	"stooges/be/internal/nostr"
+	"stooges/be/internal/store"
 )
 
 type reaction struct {
@@ -47,26 +52,37 @@ type channel struct {
 	Messages  []message `json:"messages"`
 }
 
+type demoAccount struct {
+	Name     string `json:"name"` // one of Users; the account owns their messages
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     string `json:"role"` // employee or manager
+}
+
 type seedFile struct {
 	Users []string `json:"users"`
-	// DemoAccounts names the two users to sign in as when showing the app.
-	DemoAccounts struct {
-		Employee string `json:"employee"`
-		Manager  string `json:"manager"`
-	} `json:"demo_accounts"`
-	Channels []channel `json:"channels"`
+	// DemoAccounts are email logins for seeded users, to show the app with.
+	DemoAccounts []demoAccount `json:"demo_accounts"`
+	Channels     []channel     `json:"channels"`
 }
 
 func main() {
 	file := flag.String("file", "seed/demo.json", "seed data file")
 	relayURL := flag.String("relay", "ws://localhost:7777", "relay WebSocket URL")
+	dbPath := flag.String("db", "", `the relay's SQLite file, for the demo accounts (default: DB_PATH, else "stooges.db")`)
 	flag.Parse()
-	if err := run(*file, *relayURL); err != nil {
+	if err := config.LoadDotEnv(".env"); err != nil {
+		log.Fatal(err)
+	}
+	if *dbPath == "" {
+		*dbPath = cmp.Or(os.Getenv("DB_PATH"), "stooges.db")
+	}
+	if err := run(*file, *relayURL, *dbPath); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(path, relayURL string) error {
+func run(path, relayURL, dbPath string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -123,15 +139,34 @@ func run(path, relayURL string) error {
 	fmt.Printf("done: %d new events, %d already there, %d users, %d channels\n",
 		stats.added, stats.duplicates, len(seed.Users), len(seed.Channels))
 
-	// Keys are derived from names, so anyone with this repository can derive
-	// them too: demo data only.
-	secret := func(name string) string { return hex.EncodeToString(keyFor(name).Serialize()) }
-	employee, manager := seed.DemoAccounts.Employee, seed.DemoAccounts.Manager
-	fmt.Println("\nDemo accounts. In the app, sign in with an existing key and paste the secret key:")
-	fmt.Printf("  Employee  %-12s secret key %s\n", employee, secret(employee))
-	fmt.Printf("  Manager   %-12s secret key %s\n", manager, secret(manager))
-	fmt.Printf("\nThe manager sees everyone's KPI report; others see only their own. To make this account a manager,\nset this on the relay (be/.env locally) and restart it:\n  MANAGER_PUBKEYS=%s\n",
-		nostr.PubKeyHex(keyFor(manager)))
+	return seedAccounts(seed.DemoAccounts, dbPath)
+}
+
+// seedAccounts creates the demo email accounts. Accounts live in the relay's
+// database rather than in events, so this writes to it directly; it must be
+// the same file the relay uses.
+func seedAccounts(accts []demoAccount, dbPath string) error {
+	if len(accts) == 0 {
+		return nil
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		fmt.Printf("\nSkipped demo accounts: no relay database at %s (pass -db with the relay's DB_PATH).\n", dbPath)
+		return nil
+	}
+	st, err := store.Open(dbPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	fmt.Println("\nDemo accounts (fictional; log in with email and password):")
+	for _, a := range accts {
+		if _, err := accounts.Provision(context.Background(), st, a.Email, a.Password, keyFor(a.Name), a.Role); err != nil {
+			return fmt.Errorf("demo account %s: %w", a.Email, err)
+		}
+		fmt.Printf("  %-8s  %-12s  %-20s  %s\n", a.Role, a.Name, a.Email, a.Password)
+	}
+	fmt.Println("Managers see everyone's KPI report; employees see only their own.")
 	return nil
 }
 
@@ -203,9 +238,12 @@ func validate(s *seedFile) error {
 	if len(s.Channels) == 0 {
 		return fmt.Errorf("seed needs at least one channel")
 	}
-	for _, name := range []string{s.DemoAccounts.Employee, s.DemoAccounts.Manager} {
-		if !slices.Contains(s.Users, name) {
-			return fmt.Errorf("demo account %q is not in users", name)
+	for _, a := range s.DemoAccounts {
+		if !slices.Contains(s.Users, a.Name) {
+			return fmt.Errorf("demo account %q is not in users", a.Name)
+		}
+		if a.Role != store.RoleEmployee && a.Role != store.RoleManager {
+			return fmt.Errorf("demo account %q: role must be %q or %q", a.Name, store.RoleEmployee, store.RoleManager)
 		}
 	}
 	var check func(m message) error

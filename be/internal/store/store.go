@@ -2,6 +2,7 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -59,6 +60,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 	pubkey     TEXT    NOT NULL UNIQUE,
 	auth_hash  TEXT    NOT NULL,
 	ncryptsec  TEXT    NOT NULL,
+	role       TEXT    NOT NULL DEFAULT 'employee', -- account type: employee or manager
 	created_at INTEGER NOT NULL
 );
 
@@ -87,11 +89,15 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
-	// Databases created before KPI review existed lack this column.
-	if _, err := db.Exec(`ALTER TABLE groups ADD COLUMN kpi_review INTEGER NOT NULL DEFAULT 0`); err != nil &&
-		!strings.Contains(err.Error(), "duplicate column") {
-		db.Close()
-		return nil, fmt.Errorf("apply schema: %w", err)
+	// Databases created before these features lack their columns.
+	for _, col := range []string{
+		`ALTER TABLE groups ADD COLUMN kpi_review INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE accounts ADD COLUMN role TEXT NOT NULL DEFAULT 'employee'`,
+	} {
+		if _, err := db.Exec(col); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			db.Close()
+			return nil, fmt.Errorf("apply schema: %w", err)
+		}
 	}
 	return &Store{db: db}, nil
 }
@@ -307,6 +313,29 @@ func (s *Store) SetGroupKPIReview(ctx context.Context, id string, on bool) error
 	return err
 }
 
+// DeleteGroup removes a channel, its metadata and every event posted in it.
+// It returns how many events were deleted.
+func (s *Store) DeleteGroup(ctx context.Context, id string) (int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `DELETE FROM events WHERE id IN (
+		SELECT event_id FROM event_tags WHERE name = 'h' AND value = ?
+		UNION
+		SELECT t.event_id FROM event_tags t JOIN events e ON e.id = t.event_id
+		 WHERE t.name = 'd' AND t.value = ? AND e.kind = ?)`, id, id, nostr.KindGroupMetadata)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM groups WHERE id = ?`, id); err != nil {
+		return 0, err
+	}
+	return n, tx.Commit()
+}
+
 // GroupExists reports whether a channel with the given ID exists.
 func (s *Store) GroupExists(ctx context.Context, id string) (bool, error) {
 	var one int
@@ -320,20 +349,28 @@ func (s *Store) GroupExists(ctx context.Context, id string) (bool, error) {
 // ErrAccountExists is returned when the email (or key) is already registered.
 var ErrAccountExists = errors.New("account already exists")
 
+// Account types. Everyone who signs up is an employee; only the server makes
+// managers, who may read everyone's KPI report.
+const (
+	RoleEmployee = "employee"
+	RoleManager  = "manager"
+)
+
 // Account is a stored email account.
 type Account struct {
 	Email     string
 	PubKey    string
 	AuthHash  string // bcrypt hash of the client-derived login secret
 	Ncryptsec string // the user's chat key, encrypted with their password
+	Role      string // RoleEmployee (the default) or RoleManager
 }
 
 // CreateAccount stores a new account. It returns ErrAccountExists if the
 // email or public key is taken.
 func (s *Store) CreateAccount(ctx context.Context, a Account, createdAt int64) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT OR IGNORE INTO accounts (email, pubkey, auth_hash, ncryptsec, created_at) VALUES (?, ?, ?, ?, ?)`,
-		a.Email, a.PubKey, a.AuthHash, a.Ncryptsec, createdAt)
+		`INSERT OR IGNORE INTO accounts (email, pubkey, auth_hash, ncryptsec, role, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		a.Email, a.PubKey, a.AuthHash, a.Ncryptsec, cmp.Or(a.Role, RoleEmployee), createdAt)
 	if err != nil {
 		return err
 	}
@@ -346,12 +383,30 @@ func (s *Store) CreateAccount(ctx context.Context, a Account, createdAt int64) e
 // GetAccount looks up an account by email; ok is false if there is none.
 func (s *Store) GetAccount(ctx context.Context, email string) (a Account, ok bool, err error) {
 	err = s.db.QueryRowContext(ctx,
-		`SELECT email, pubkey, auth_hash, ncryptsec FROM accounts WHERE email = ?`, email).
-		Scan(&a.Email, &a.PubKey, &a.AuthHash, &a.Ncryptsec)
+		`SELECT email, pubkey, auth_hash, ncryptsec, role FROM accounts WHERE email = ?`, email).
+		Scan(&a.Email, &a.PubKey, &a.AuthHash, &a.Ncryptsec, &a.Role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Account{}, false, nil
 	}
 	return a, err == nil, err
+}
+
+// SetRole changes an account's type; ok is false if there is no such account.
+func (s *Store) SetRole(ctx context.Context, email, role string) (ok bool, err error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE accounts SET role = ? WHERE email = ?`, role, email)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// IsManager reports whether the account with this public key is a manager.
+func (s *Store) IsManager(ctx context.Context, pubkey string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM accounts WHERE pubkey = ? AND role = ?`, pubkey, RoleManager).Scan(&n)
+	return n > 0, err
 }
 
 // GetMeta reads a relay setting; ok is false if it is not set.

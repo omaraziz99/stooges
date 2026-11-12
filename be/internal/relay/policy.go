@@ -14,14 +14,14 @@ import (
 )
 
 const (
-	maxFutureSkew    = 15 * time.Minute
-	maxMessageChars  = 8000
-	maxProfileBytes  = 4096
-	maxChannelName   = 64
-	maxChannelAbout  = 280
-	defaultChannelID = "general"
-	maxReportBytes   = 900 * 1024
-	maxConsentBytes  = 256
+	maxFutureSkew       = 15 * time.Minute
+	maxMessageChars     = 8000
+	maxProfileBytes     = 4096
+	maxChannelName      = 64
+	maxChannelAbout     = 280
+	oldDefaultChannelID = "general" // no longer created; see RemoveOldDefaultChannel
+	maxReportBytes      = 900 * 1024
+	maxConsentBytes     = 256
 )
 
 var channelIDPattern = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
@@ -275,17 +275,17 @@ func (r *Relay) saveChannelMetadata(ctx context.Context, g store.Group) (*nostr.
 	return meta, nil
 }
 
-// EnsureDefaultChannel creates the #general channel on first start.
-func (r *Relay) EnsureDefaultChannel(ctx context.Context) error {
-	exists, err := r.store.GroupExists(ctx, defaultChannelID)
-	if err != nil || exists {
+// RemoveOldDefaultChannel deletes the #general channel that earlier versions
+// of the relay created on start, with its messages. A #general someone
+// created themselves is kept.
+func (r *Relay) RemoveOldDefaultChannel(ctx context.Context) error {
+	g, ok, err := r.store.GetGroup(ctx, oldDefaultChannelID)
+	if err != nil || !ok || g.CreatedBy != r.pubkey {
 		return err
 	}
-	// Owned by the relay, so nobody can turn KPI review on for it.
-	g := store.Group{ID: defaultChannelID, Name: defaultChannelID, About: "Company-wide chat", CreatedBy: r.pubkey}
-	if err := r.store.CreateGroup(ctx, g, time.Now().Unix()); err != nil {
-		return err
+	n, err := r.store.DeleteGroup(ctx, oldDefaultChannelID)
+	if err == nil {
+		r.log.Info("removed the old #general channel", "events", n)
 	}
-	_, err = r.saveChannelMetadata(ctx, g)
 	return err
 }

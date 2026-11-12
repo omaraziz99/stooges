@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http/httptest"
@@ -25,21 +26,26 @@ type testConn struct {
 
 func newTestRelay(t *testing.T) string {
 	t.Helper()
-	return newTestRelayWith(t, Options{KPIPublisher: agentPub, Managers: []string{bossPub}})
+	return newTestRelayWith(t, Options{KPIPublisher: agentPub}, bossPub)
 }
 
-func newTestRelayWith(t *testing.T, opts Options) string {
+// newTestRelayWith starts a relay; managers are the public keys of accounts
+// whose type is manager.
+func newTestRelayWith(t *testing.T, opts Options, managers ...string) string {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
+	for i, pub := range managers {
+		acct := store.Account{Email: fmt.Sprintf("manager%d@example.com", i), PubKey: pub, AuthHash: "-", Ncryptsec: "-", Role: store.RoleManager}
+		if err := st.CreateAccount(context.Background(), acct, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
 	key, _ := btcec.NewPrivateKey()
 	r := New(st, key, slog.New(slog.NewTextHandler(io.Discard, nil)), opts)
-	if err := r.EnsureDefaultChannel(context.Background()); err != nil {
-		t.Fatal(err)
-	}
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 	return "ws" + strings.TrimPrefix(srv.URL, "http")
@@ -126,11 +132,8 @@ func TestChatFlow(t *testing.T) {
 	bob, ch2 := dial(t, url)
 	bob.login(ch2)
 
-	// Bob lists channels: #general exists from startup.
+	// Bob lists channels: there are none at startup.
 	bob.send("REQ", "channels", map[string]any{"kinds": []int{nostr.KindGroupMetadata}})
-	if msg := bob.read(); msg[0] != "EVENT" {
-		t.Fatalf("expected channel metadata, got %v", msg)
-	}
 	if msg := bob.read(); msg[0] != "EOSE" {
 		t.Fatalf("expected EOSE, got %v", msg)
 	}

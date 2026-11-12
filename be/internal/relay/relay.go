@@ -41,8 +41,7 @@ type Relay struct {
 	log      *slog.Logger
 	upgrader websocket.Upgrader
 
-	kpiPublisher string          // only this pubkey may publish KPI reports ("" = nobody)
-	managers     map[string]bool // who may read everyone's KPI report
+	kpiPublisher string // only this pubkey may publish KPI reports ("" = nobody)
 
 	mu      sync.RWMutex
 	clients map[*client]struct{}
@@ -52,8 +51,6 @@ type Relay struct {
 type Options struct {
 	// KPIPublisher is the hex pubkey of the KPI agent. Empty disables reports.
 	KPIPublisher string
-	// Managers are the hex pubkeys that may read everyone's KPI report.
-	Managers []string
 	// AllowedOrigins limits which web pages may connect, e.g.
 	// ["https://stooges.vercel.app", "https://*.vercel.app"]. A "*" matches
 	// any characters. Empty allows any origin: identity comes from signed
@@ -64,17 +61,12 @@ type Options struct {
 // New creates a relay. key signs relay-authored events such as channel metadata.
 func New(st *store.Store, key *btcec.PrivateKey, log *slog.Logger, opts Options) *Relay {
 	allowed := origin.Normalize(opts.AllowedOrigins)
-	managers := map[string]bool{}
-	for _, m := range opts.Managers {
-		managers[m] = true
-	}
 	return &Relay{
 		store:        st,
 		key:          key,
 		pubkey:       nostr.PubKeyHex(key),
 		log:          log,
 		kpiPublisher: strings.ToLower(strings.TrimSpace(opts.KPIPublisher)),
-		managers:     managers,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  4096,
 			WriteBufferSize: 4096,
@@ -279,9 +271,9 @@ func (r *Relay) canRead(c *client, ev *nostr.Event) bool {
 		return true
 	}
 	c.mu.Lock()
-	pubkey := c.pubkey
+	pubkey, manager := c.pubkey, c.manager
 	c.mu.Unlock()
-	return pubkey != "" && (r.managers[pubkey] || pubkey == r.kpiPublisher || pubkey == owner)
+	return pubkey != "" && (manager || pubkey == r.kpiPublisher || pubkey == owner)
 }
 
 // sendReports delivers stored KPI reports to subscriptions opened before
@@ -336,9 +328,15 @@ func (r *Relay) handleAuth(ctx context.Context, c *client, ev *nostr.Event) {
 		fail("invalid: auth event is too old or too far in the future")
 		return
 	}
+	// Managers (an account type) read everyone's KPI report.
+	manager, err := r.store.IsManager(ctx, ev.PubKey)
+	if err != nil {
+		r.log.Error("manager lookup failed", "err", err)
+	}
 	c.mu.Lock()
 	first := c.pubkey == ""
 	c.pubkey = ev.PubKey
+	c.manager = manager
 	c.mu.Unlock()
 	c.reply(encode("OK", ev.ID, true, ""))
 	if first {
@@ -395,9 +393,10 @@ type client struct {
 	closeOnce sync.Once
 	challenge string
 
-	mu     sync.Mutex
-	pubkey string // set after a successful NIP-42 AUTH
-	subs   map[string][]nostr.Filter
+	mu      sync.Mutex
+	pubkey  string // set after a successful NIP-42 AUTH
+	manager bool   // the signed-in account is a manager
+	subs    map[string][]nostr.Filter
 }
 
 // reply queues a direct response, waiting if the buffer is full.

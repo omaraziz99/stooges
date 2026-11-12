@@ -73,7 +73,7 @@ func TestOnlyTheAgentCanPublishReports(t *testing.T) {
 
 func TestOnlyManagersCanReadReports(t *testing.T) {
 	managerKey, _ := btcec.NewPrivateKey()
-	url := newTestRelayWith(t, Options{KPIPublisher: agentPub, Managers: []string{nostr.PubKeyHex(managerKey)}})
+	url := newTestRelayWith(t, Options{KPIPublisher: agentPub}, nostr.PubKeyHex(managerKey))
 	filter := map[string]any{"kinds": []int{nostr.KindAppData}, "#d": []string{"kpi-report"}}
 
 	agent, ch := dial(t, url)
@@ -145,7 +145,7 @@ func TestOptInIsPublishedByThePersonAndReadableByTheAgent(t *testing.T) {
 	// Even with reports restricted to managers, opt-ins stay readable: the
 	// agent reads them without signing in.
 	managerKey, _ := btcec.NewPrivateKey()
-	url := newTestRelayWith(t, Options{KPIPublisher: agentPub, Managers: []string{nostr.PubKeyHex(managerKey)}})
+	url := newTestRelayWith(t, Options{KPIPublisher: agentPub}, nostr.PubKeyHex(managerKey))
 	consent := nostr.Tag{"d", "kpi-consent"}
 
 	user, ch := dial(t, url)
@@ -194,7 +194,7 @@ func TestKPIReviewIsOffUnlessTheCreatorTurnsItOn(t *testing.T) {
 	if ok, reason := creator.publish(creator.signed(nostr.KindCreateGroup, "", nostr.Tag{"h", "lunch"})); !ok {
 		t.Fatalf("create channel: %s", reason)
 	}
-	if kpiOn(metaOf(creator, "lunch")) || kpiOn(metaOf(creator, "general")) {
+	if kpiOn(metaOf(creator, "lunch")) {
 		t.Fatal("channels must not be reviewed unless someone asks for it")
 	}
 
@@ -205,9 +205,6 @@ func TestKPIReviewIsOffUnlessTheCreatorTurnsItOn(t *testing.T) {
 	}
 	if ok, reason := turnOn(other, "lunch"); ok || !strings.HasPrefix(reason, "restricted") {
 		t.Fatalf("only the creator may change a channel, got ok=%v %q", ok, reason)
-	}
-	if ok, reason := turnOn(creator, "general"); ok || !strings.HasPrefix(reason, "restricted") {
-		t.Fatalf("#general belongs to the relay and must stay unreviewed, got ok=%v %q", ok, reason)
 	}
 	if ok, reason := turnOn(creator, "lunch"); !ok {
 		t.Fatalf("the creator should be able to turn review on: %s", reason)

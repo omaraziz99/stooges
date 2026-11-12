@@ -9,10 +9,10 @@
     "Ben Ortiz",
     "Priya Nair"
   ],
-  "demo_accounts": {
-    "employee": "Maya Chen",
-    "manager": "Priya Nair"
-  },
+  "demo_accounts": [
+    { "name": "Maya Chen", "email": "maya@example.com", "password": "orbit-demo-2026", "role": "employee" },
+    { "name": "Priya Nair", "email": "priya@example.com", "password": "orbit-demo-2026", "role": "manager" }
+  ],
   "channels": [
     {
       "id": "project-orbit",
