@@ -9,6 +9,7 @@ import { Sidebar } from './components/Sidebar'
 import { ThreadPanel } from './components/ThreadPanel'
 import { buildChannelState, errorText, Kind, setProfileName } from './lib/chat'
 import { clearSecretKey, loadSecretKey, saveSecretKey } from './lib/keys'
+import { useT } from './lib/prefs'
 import {
   NotifyProvider,
   ProfilesProvider,
@@ -55,6 +56,7 @@ export default function App() {
 function Workspace({ newName }: { newName: string | null }) {
   const { client, pubkey } = useRelay()
   const notify = useNotify()
+  const t = useT()
   const { channels } = useChannels()
   // Until someone picks a channel, show the first one.
   const [pickedId, setActiveId] = useState<string | null>(null)
@@ -114,9 +116,9 @@ function Workspace({ newName }: { newName: string | null }) {
   // The report is a live subscription, so it is already the latest.
   const runCommand = async (text: string) => {
     const cmd = parseKpiCommand(text)
-    if (!cmd) throw new Error(`Unknown command ${text.split(/\s/)[0]}. Try /kpi-<name>.`)
-    if (report === undefined) throw new Error('The KPI report is still loading. Try again in a moment.')
-    if (!report) throw new Error('No KPI report for you yet. Opt in from the sidebar; it appears after the agent next runs.')
+    if (!cmd) throw new Error(t('Unknown command {cmd}. Try /kpi-<name>.', { cmd: text.split(/\s/)[0] }))
+    if (report === undefined) throw new Error(t('The KPI report is still loading. Try again in a moment.'))
+    if (!report) throw new Error(t('No KPI report for you yet. Opt in from the sidebar; it appears after the agent next runs.'))
     if (!cmd.query) {
       setKpiSelected(null)
       setView('kpi')
@@ -124,28 +126,35 @@ function Workspace({ newName }: { newName: string | null }) {
     }
     const matches = findPeople(report.people, cmd.query)
     if (matches.length === 0) {
-      if (report.personal) throw new Error('You can only open your own KPI review.')
-      throw new Error(`No one called "${cmd.query}" in the report. Try ${report.people.map((p) => commandFor(p.name)).join(', ')}.`)
+      if (report.personal) throw new Error(t('You can only open your own KPI review.'))
+      throw new Error(
+        t('No one called "{q}" in the report. Try {options}.', {
+          q: cmd.query,
+          options: report.people.map((p) => commandFor(p.name)).join(', '),
+        }),
+      )
     }
     if (matches.length > 1) {
-      throw new Error(`"${cmd.query}" matches ${matches.map((p) => p.name).join(' and ')}. Type more of the name.`)
+      throw new Error(
+        t('"{q}" matches {names}. Type more of the name.', { q: cmd.query, names: matches.map((p) => p.name).join(' & ') }),
+      )
     }
     setThreadRootId(null)
     setReviewName(matches[0].name)
   }
 
   const suggest = (text: string): Suggestion[] => {
-    const t = text.trimStart().toLowerCase()
-    if (!report || !t.startsWith('/') || t.includes('\n')) return []
-    const cmd = parseKpiCommand(t)
-    if (!cmd && !'/kpi'.startsWith(t)) return []
+    const typed = text.trimStart().toLowerCase()
+    if (!report || !typed.startsWith('/') || typed.includes('\n')) return []
+    const cmd = parseKpiCommand(typed)
+    if (!cmd && !'/kpi'.startsWith(typed)) return []
     const people = cmd?.query ? findPeople(report.people, cmd.query) : report.people
     return people
-      .filter((p) => commandFor(p.name) !== t.trim())
+      .filter((p) => commandFor(p.name) !== typed.trim())
       .map((p) => ({
         value: commandFor(p.name),
-        label: `KPI review for ${p.name}`,
-        hint: `${p.evidence.length} ${p.evidence.length === 1 ? 'item' : 'items'}`,
+        label: t('KPI review for {name}', { name: p.name }),
+        hint: t(p.evidence.length === 1 ? '{n} item' : '{n} items', { n: p.evidence.length }),
       }))
   }
 
@@ -174,9 +183,13 @@ function Workspace({ newName }: { newName: string | null }) {
         />
       ) : !activeId ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-stone-500">
-          <p>No channels yet. Create one with <strong className="text-stone-700">Add channel</strong> in the sidebar.</p>
+          <p>
+            {t.rich('No channels yet. Create one with {add} in the sidebar.', {
+              add: <strong className="text-stone-700">{t('Add channel')}</strong>,
+            })}
+          </p>
           <button onClick={() => setSidebarOpen(true)} className="text-sm font-medium text-sky-700 hover:underline md:hidden">
-            Open channel list
+            {t('Open channel list')}
           </button>
         </div>
       ) : (

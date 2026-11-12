@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { deleteEvents, errorText, QUICK_REACTIONS, react, type ReactionGroup } from '../lib/chat'
+import { CUSTOM_EMOJI, deleteEvents, errorText, QUICK_REACTIONS, react, type ReactionGroup } from '../lib/chat'
 import { displayName, formatTime, fullTimestamp } from '../lib/format'
 import type { NostrEvent } from '../lib/relay'
+import { useT } from '../lib/prefs'
 import { useNotify, useProfiles, useRelay } from '../state/relay'
 import { Avatar } from './Avatar'
 
@@ -19,6 +20,7 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
   const { client, pubkey: me } = useRelay()
   const profiles = useProfiles()
   const notify = useNotify()
+  const t = useT()
   const [pickerOpen, setPickerOpen] = useState(false)
   const name = displayName(profiles, event.pubkey)
   const mine = event.pubkey === me
@@ -36,7 +38,7 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
   }
 
   const remove = () => {
-    if (window.confirm('Delete this message? This cannot be undone.')) {
+    if (window.confirm(t('Delete this message? This cannot be undone.'))) {
       run(deleteEvents(client, channelId, [event.id]))
     }
   }
@@ -82,7 +84,7 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
                     : 'border-stone-200 bg-white text-stone-700 hover:border-stone-400'
                 }`}
               >
-                <span>{g.emoji}</span>
+                <Emoji emoji={g.emoji} />
                 <span className="text-xs font-medium">{g.pubkeys.length}</span>
               </button>
             ))}
@@ -91,7 +93,7 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
 
         {onOpenThread && replyCount > 0 && (
           <button onClick={onOpenThread} className="mt-1 text-sm font-medium text-sky-700 hover:underline">
-            {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+            {t(replyCount === 1 ? '{n} reply' : '{n} replies', { n: replyCount })}
           </button>
         )}
       </div>
@@ -99,17 +101,17 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
       <div
         className={`${pickerOpen ? 'flex' : 'hidden group-hover:flex'} absolute -top-3 right-4 items-center gap-0.5 rounded-lg border border-stone-200 bg-white p-0.5 shadow-sm`}
       >
-        <button className={toolButton} onClick={() => setPickerOpen((o) => !o)} title="Add reaction">
+        <button className={toolButton} onClick={() => setPickerOpen((o) => !o)} title={t('Add reaction')}>
           ☺︎+
         </button>
         {onOpenThread && (
-          <button className={toolButton} onClick={onOpenThread} title="Reply in thread">
-            Reply
+          <button className={toolButton} onClick={onOpenThread} title={t('Reply in thread')}>
+            {t('Reply')}
           </button>
         )}
         {mine && (
-          <button className={`${toolButton} hover:text-rose-700`} onClick={remove} title="Delete message">
-            Delete
+          <button className={`${toolButton} hover:text-rose-700`} onClick={remove} title={t('Delete message')}>
+            {t('Delete')}
           </button>
         )}
       </div>
@@ -121,13 +123,28 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
               key={emoji}
               onClick={() => toggleReaction(emoji)}
               className="rounded px-1.5 py-1 text-lg hover:bg-stone-100"
-              aria-label={`React with ${emoji}`}
+              aria-label={`React with ${CUSTOM_EMOJI[emoji]?.label ?? emoji}`}
+              title={CUSTOM_EMOJI[emoji]?.label}
             >
-              {emoji}
+              <Emoji emoji={emoji} large />
             </button>
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+/** A reaction emoji: our own image for custom ones like :kopi:, else the text. */
+function Emoji({ emoji, large = false }: { emoji: string; large?: boolean }) {
+  const custom = CUSTOM_EMOJI[emoji]
+  if (!custom) return <span>{emoji}</span>
+  return (
+    <img
+      src={custom.src}
+      alt={emoji}
+      draggable={false}
+      className={`custom-emoji inline-block object-contain ${large ? 'size-7' : 'size-5'}`}
+    />
   )
 }

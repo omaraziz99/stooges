@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { commandFor, PILLAR_COLORS, totalEvidence, type Evidence, type KpiReport, type Person, type PillarId } from '../lib/kpi'
 import { avatarColor, initials } from '../lib/format'
+import { useT } from '../lib/prefs'
 import { dateFmt, EvidenceList, ReviewCard, Swatch } from './KpiParts'
 
 export function KpiDashboard({
@@ -16,6 +17,7 @@ export function KpiDashboard({
   onOpenSource: (e: Evidence) => void
   onOpenSidebar: () => void
 }) {
+  const t = useT()
   // Someone's own report holds only them, so open it straight away.
   const person =
     (report?.personal ? report.people[0] : report?.people.find((p) => p.name === selected)) ?? null
@@ -26,17 +28,17 @@ export function KpiDashboard({
         <button
           onClick={onOpenSidebar}
           className="rounded p-1.5 text-stone-600 hover:bg-stone-100 md:hidden"
-          aria-label="Open channel list"
+          aria-label={t('Open channel list')}
         >
           ☰
         </button>
         <div className="min-w-0">
           <h1 className="truncate font-semibold text-stone-900">
-            {report?.personal ? 'Your KPI insights' : 'KPI insights'}
+            {report?.personal ? t('Your KPI insights') : t('KPI insights')}
           </h1>
           {report && (
             <p className="truncate text-xs text-stone-500">
-              {report.channels.map((c) => `#${c}`).join(', ')} · {dateFmt(report.from)} to {dateFmt(report.to)}
+              {report.channels.map((c) => `#${c}`).join(', ')} · {dateFmt(report.from)} – {dateFmt(report.to)}
             </p>
           )}
         </div>
@@ -45,10 +47,10 @@ export function KpiDashboard({
       <div className="flex-1 overflow-y-auto">
         {report?.personal && (
           <p className="border-b border-stone-200 bg-stone-50 px-6 py-2 text-xs text-stone-600">
-            This is your own report. Only you and your manager can see it; you cannot see anyone else's.
+            {t("This is your own report. Only you and your manager can see it; you cannot see anyone else's.")}
           </p>
         )}
-        {report === undefined && <p className="p-6 text-sm text-stone-500">Loading report…</p>}
+        {report === undefined && <p className="p-6 text-sm text-stone-500">{t('Loading report…')}</p>}
         {report === null && <NoReport />}
         {report && !person && <Overview report={report} onSelect={onSelect} />}
         {report && person && (
@@ -60,38 +62,47 @@ export function KpiDashboard({
 }
 
 function NoReport() {
+  const t = useT()
   return (
     <div className="mx-auto max-w-xl p-6">
-      <h2 className="text-lg font-semibold text-stone-900">No report for you yet</h2>
+      <h2 className="text-lg font-semibold text-stone-900">{t('No report for you yet')}</h2>
       <p className="mt-2 text-sm text-stone-600">
-        You see your own report here, and nobody else's. It appears once you have opted in (
-        <strong>KPI insights</strong> in your account menu: click your name in the sidebar), posted in a channel marked <strong>KPI insights on</strong>, and
-        the agent has run. Manager accounts see everyone's.
+        {t.rich(
+          "You see your own report here, and nobody else's. It appears once you have opted in ({kpi} in your account menu: click your name in the sidebar), posted in a channel marked {on}, and the agent has run. Manager accounts see everyone's.",
+          { kpi: <strong>{t('KPI insights')}</strong>, on: <strong>{t('KPI insights on')}</strong> },
+        )}
       </p>
       <p className="mt-3 text-sm text-stone-600">
-        The KPI agent reads those channels, asks an AI model what each opted-in person visibly contributed, and writes
-        the reports. With the relay running, run:
+        {t(
+          'The KPI agent reads those channels, asks an AI model what each opted-in person visibly contributed, and writes the reports. With the relay running, run:',
+        )}
       </p>
       <pre className="mt-3 overflow-x-auto rounded-lg bg-stone-900 p-3 text-xs text-stone-100">
         {`cd be\ngo run ./cmd/kpi`}
       </pre>
       <p className="mt-3 text-sm text-stone-600">
-        It needs <code>GEMINI_API_KEY</code> and <code>KPI_AGENT_SECRET</code> in <code>be/.env</code>. The report
-        appears here as soon as it's published.
+        {t.rich("It needs {gemini} and {secret} in {env}. The report appears here as soon as it's published.", {
+          gemini: <code>GEMINI_API_KEY</code>,
+          secret: <code>KPI_AGENT_SECRET</code>,
+          env: <code>be/.env</code>,
+        })}
       </p>
     </div>
   )
 }
 
 function Notice({ report }: { report: KpiReport }) {
+  const t = useT()
   const pending = report.skipped?.filter((s) => s.includes('not reviewed yet')).length ?? 0
   return (
     <div className="space-y-3">
       {pending > 0 && (
         <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong className="font-semibold">Partial report.</strong> {pending} conversations and the written reviews are
-          still pending because the AI quota ran out. Run <code>go run ./cmd/kpi</code> again after it resets; finished
-          conversations won't be sent again.
+          <strong className="font-semibold">{t('Partial report.')}</strong>{' '}
+          {t.rich(
+            "{n} conversations and the written reviews are still pending because the AI quota ran out. Run {cmd} again after it resets; finished conversations won't be sent again.",
+            { n: pending, cmd: <code>go run ./cmd/kpi</code> },
+          )}
         </div>
       )}
       <NoticeBody report={report} />
@@ -100,26 +111,32 @@ function Notice({ report }: { report: KpiReport }) {
 }
 
 function NoticeBody({ report }: { report: KpiReport }) {
+  const t = useT()
   return (
     <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
-      <strong className="font-semibold">AI-drafted evidence, for conversations, not rankings.</strong> Each item links to
-      the messages it comes from. Check them before using any item in a review. Chat shows only part of anyone's work.
+      <strong className="font-semibold">{t('AI-drafted evidence, for conversations, not rankings.')}</strong>{' '}
+      {t("Each item links to the messages it comes from. Check them before using any item in a review. Chat shows only part of anyone's work.")}
       <span className="mt-1 block text-xs text-stone-500">
-        {report.conversations} conversations reviewed by {report.model} on {dateFmt(report.generated_at)}
-        {report.skipped?.length ? ` · ${report.skipped.length} skipped` : ''} · Tip: type{' '}
-        <code>/kpi-&lt;name&gt;</code> in any channel to open a review
+        {t('{n} conversations reviewed by {model} on {date}', {
+          n: report.conversations,
+          model: report.model,
+          date: dateFmt(report.generated_at),
+        })}
+        {report.skipped?.length ? ` · ${t('{n} skipped', { n: report.skipped.length })}` : ''} ·{' '}
+        {t.rich('Tip: type {cmd} in any channel to open a review', { cmd: <code>/kpi-&lt;name&gt;</code> })}
       </span>
     </div>
   )
 }
 
 function Legend({ report }: { report: KpiReport }) {
+  const t = useT()
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
       {report.pillars.map((p) => (
         <li key={p.id} className="flex items-center gap-1.5">
           <Swatch pillar={p.id} />
-          {p.name}
+          {t(p.name)}
         </li>
       ))}
     </ul>
@@ -127,6 +144,7 @@ function Legend({ report }: { report: KpiReport }) {
 }
 
 function Overview({ report, onSelect }: { report: KpiReport; onSelect: (name: string) => void }) {
+  const t = useT()
   const maxTotal = Math.max(1, ...report.people.map(totalEvidence))
 
   return (
@@ -135,14 +153,14 @@ function Overview({ report, onSelect }: { report: KpiReport; onSelect: (name: st
 
       <section aria-labelledby="team-heading">
         <h2 id="team-heading" className="mb-3 text-sm font-semibold text-stone-900">
-          Team evidence by pillar
+          {t('Team evidence by pillar')}
         </h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {report.pillars.map((p) => (
             <div key={p.id} className="rounded-lg border border-stone-200 p-3" title={p.description}>
               <div className="flex items-center gap-1.5 text-xs font-medium text-stone-600">
                 <Swatch pillar={p.id} />
-                {p.name}
+                {t(p.name)}
               </div>
               <div className="mt-1 text-2xl font-semibold text-stone-900 tabular-nums">{report.team.counts[p.id]}</div>
             </div>
@@ -153,7 +171,7 @@ function Overview({ report, onSelect }: { report: KpiReport; onSelect: (name: st
       <section aria-labelledby="people-heading">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="people-heading" className="text-sm font-semibold text-stone-900">
-            People <span className="font-normal text-stone-500">(alphabetical)</span>
+            {t('People')} <span className="font-normal text-stone-500">{t('(alphabetical)')}</span>
           </h2>
           <Legend report={report} />
         </div>
@@ -174,7 +192,8 @@ function Overview({ report, onSelect }: { report: KpiReport; onSelect: (name: st
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="truncate font-medium text-stone-900">{person.name}</span>
                     <span className="shrink-0 text-xs text-stone-500 tabular-nums">
-                      {totalEvidence(person)} {totalEvidence(person) === 1 ? 'item' : 'items'} · {person.messages} messages
+                      {t(totalEvidence(person) === 1 ? '{n} item' : '{n} items', { n: totalEvidence(person) })} ·{' '}
+                      {t('{n} messages', { n: person.messages })}
                     </span>
                   </div>
                   <PillarBar report={report} person={person} maxTotal={maxTotal} />
@@ -193,11 +212,12 @@ function Overview({ report, onSelect }: { report: KpiReport; onSelect: (name: st
 
 /** One thin stacked bar per person: segment length = evidence count per pillar. */
 function PillarBar({ report, person, maxTotal }: { report: KpiReport; person: Person; maxTotal: number }) {
+  const t = useT()
   const total = totalEvidence(person)
-  if (total === 0) return <p className="mt-1.5 text-xs text-stone-400">No evidence found in these channels yet</p>
+  if (total === 0) return <p className="mt-1.5 text-xs text-stone-400">{t('No evidence found in these channels yet')}</p>
   const summary = report.pillars
     .filter((p) => person.counts[p.id] > 0)
-    .map((p) => `${p.name}: ${person.counts[p.id]}`)
+    .map((p) => `${t(p.name)}: ${person.counts[p.id]}`)
     .join(', ')
   return (
     <div className="mt-1.5">
@@ -206,7 +226,7 @@ function PillarBar({ report, person, maxTotal }: { report: KpiReport; person: Pe
           person.counts[p.id] > 0 ? (
             <span
               key={p.id}
-              title={`${p.name}: ${person.counts[p.id]}`}
+              title={`${t(p.name)}: ${person.counts[p.id]}`}
               className="h-full first:rounded-l last:rounded-r"
               style={{ flexGrow: person.counts[p.id], background: PILLAR_COLORS[p.id] }}
             />
@@ -229,6 +249,7 @@ function PersonView({
   onBack: () => void
   onOpenSource: (e: Evidence) => void
 }) {
+  const t = useT()
   const [filter, setFilter] = useState<PillarId | 'all'>('all')
   const items = useMemo(
     () => person.evidence.filter((e) => filter === 'all' || e.pillar === filter),
@@ -243,14 +264,15 @@ function PersonView({
     <div className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
       {!report.personal && (
         <button onClick={onBack} className="text-sm font-medium text-sky-700 hover:underline">
-          ← All people
+          {t('← All people')}
         </button>
       )}
       <div>
         <h2 className="text-xl font-bold text-stone-900">{person.name}</h2>
         <p className="text-sm text-stone-500">
-          {totalEvidence(person)} pieces of evidence from {person.messages} messages ·{' '}
-          {(['high', 'medium', 'low'] as const).map((i) => `${person.impact[i]} ${i}`).join(', ')} impact · in chat:{' '}
+          {t('{n} pieces of evidence from {m} messages', { n: totalEvidence(person), m: person.messages })} ·{' '}
+          {(['high', 'medium', 'low'] as const).map((i) => t(`{n} ${i}`, { n: person.impact[i] })).join(', ')}{' '}
+          {t('impact · in chat:')}{' '}
           <code>{commandFor(person.name)}</code>
         </p>
       </div>
@@ -259,19 +281,19 @@ function PersonView({
 
       {person.evidence.length > 0 && (
         <>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by pillar">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('Filter by pillar')}>
             <button className={chip(filter === 'all')} onClick={() => setFilter('all')}>
-              All ({totalEvidence(person)})
+              {t('All ({n})', { n: totalEvidence(person) })}
             </button>
             {report.pillars.map((p) => (
               <button key={p.id} className={chip(filter === p.id)} onClick={() => setFilter(p.id)}>
                 <Swatch pillar={p.id} />
-                {p.name} ({person.counts[p.id]})
+                {t(p.name)} ({person.counts[p.id]})
               </button>
             ))}
           </div>
           {items.length === 0 ? (
-            <p className="text-sm text-stone-500">No evidence in this pillar yet.</p>
+            <p className="text-sm text-stone-500">{t('No evidence in this pillar yet.')}</p>
           ) : (
             <EvidenceList report={report} items={items} onOpenSource={onOpenSource} />
           )}

@@ -3,8 +3,10 @@ import { ChartColumn, Ellipsis, Hash, Lock, LogOut, Pencil, Plus, Search } from 
 import { createChannel, errorText, setConsent, setProfileName, slugify, type Channel } from '../lib/chat'
 import { displayName } from '../lib/format'
 import type { Status } from '../lib/relay'
+import { useT } from '../lib/prefs'
 import { useMyConsent, useNotify, useProfiles, useRelay } from '../state/relay'
 import { Avatar } from './Avatar'
+import { ManglishSwitch, ThemeSwitch } from './PrefsControls'
 
 const STATUS: Record<Status, { dot: string; label: string }> = {
   ready: { dot: 'bg-emerald-500', label: 'Connected' },
@@ -40,6 +42,7 @@ export function Sidebar({
   kpiActive: boolean
   onOpenKpi: () => void
 }) {
+  const t = useT()
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -73,8 +76,8 @@ export function Sidebar({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-              placeholder="Search channels"
-              aria-label="Search channels"
+              placeholder={t('Search channels')}
+              aria-label={t('Search channels')}
               className={`${fieldClass} py-2 pr-10 pl-8`}
             />
             <kbd className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 font-sans text-xs text-stone-400">
@@ -86,17 +89,17 @@ export function Sidebar({
         <div className="flex-1 overflow-y-auto px-2.5 pb-3">
           <button onClick={onOpenKpi} className={`mt-2 ${row(kpiActive)}`}>
             <ChartColumn aria-hidden className="size-4 text-stone-600" />
-            KPI insights
+            {t('KPI insights')}
           </button>
 
-          <p className={sectionLabel}>Channels</p>
+          <p className={sectionLabel}>{t('Channels')}</p>
           <ul>
             {shown.map((c) => (
               <li key={c.id}>
                 <button onClick={() => onSelect(c.id)} className={row(c.id === activeId && !kpiActive)} title={c.about || undefined}>
                   {/* Work channels (KPI insights on) get a lock, like a private channel in Buzz. */}
                   {c.kpiReview ? (
-                    <Lock aria-label="Work channel" className="size-4 shrink-0 text-stone-500" />
+                    <Lock aria-label={t('Work channel')} className="size-4 shrink-0 text-stone-500" />
                   ) : (
                     <Hash aria-hidden className="size-4 shrink-0 text-stone-500" />
                   )}
@@ -105,7 +108,7 @@ export function Sidebar({
               </li>
             ))}
           </ul>
-          {q && shown.length === 0 && <p className="px-2.5 py-1.5 text-sm text-stone-500">No channels match “{query}”.</p>}
+          {q && shown.length === 0 && <p className="px-2.5 py-1.5 text-sm text-stone-500">{t('No channels match “{q}”.', { q: query })}</p>}
           <AddChannel onCreated={onSelect} />
         </div>
 
@@ -117,6 +120,7 @@ export function Sidebar({
 
 function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
   const { client } = useRelay()
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [about, setAbout] = useState('')
@@ -128,7 +132,7 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
     e.preventDefault()
     const id = slugify(name)
     if (!id) {
-      setError('Use letters or numbers in the name.')
+      setError(t('Use letters or numbers in the name.'))
       return
     }
     setBusy(true)
@@ -151,7 +155,7 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
     return (
       <button onClick={() => setOpen(true)} className={`${row(false)} text-stone-600`}>
         <Plus aria-hidden className="size-4 text-stone-500" />
-        Add channel
+        {t('Add channel')}
       </button>
     )
   }
@@ -162,15 +166,15 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Channel name"
-        aria-label="Channel name"
+        placeholder={t('Channel name')}
+        aria-label={t('Channel name')}
         maxLength={64}
         className={fieldClass}
       />
       <input
         value={about}
         onChange={(e) => setAbout(e.target.value)}
-        placeholder="What's it about? (optional)"
+        placeholder={t("What's it about? (optional)")}
         aria-label="Channel description"
         maxLength={280}
         className={fieldClass}
@@ -183,8 +187,8 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
           className="mt-0.5 accent-stone-900"
         />
         <span>
-          Work channel: include in KPI insights
-          <span className="block text-stone-500">Off by default. Everyone sees a badge when it is on.</span>
+          {t('Work channel: include in KPI insights')}
+          <span className="block text-stone-500">{t('Off by default. Everyone sees a badge when it is on.')}</span>
         </span>
       </label>
       {name && slugify(name) && <p className="text-xs text-stone-500">ID: {slugify(name)}</p>}
@@ -195,7 +199,7 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
           disabled={busy || !name.trim()}
           className="rounded-lg bg-stone-900 px-3 py-1 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-40"
         >
-          {busy ? 'Creating…' : 'Create'}
+          {busy ? t('Creating…') : t('Create')}
         </button>
         <button
           type="button"
@@ -205,7 +209,7 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
           }}
           className="rounded-lg px-3 py-1 text-sm text-stone-600 hover:text-stone-900"
         >
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
     </form>
@@ -216,7 +220,9 @@ function Me() {
   const { client, pubkey, signOut, status } = useRelay()
   const profiles = useProfiles()
   const notify = useNotify()
+  const t = useT()
   const name = displayName(profiles, pubkey)
+  const statusLabel = t(STATUS[status].label)
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -242,8 +248,10 @@ function Me() {
   const toggleConsent = async () => {
     const next = !consent.consented
     const question = next
-      ? 'Opt in to KPI insights?\n\nAn AI agent will read your messages in channels marked "KPI insights on" and note positive contributions for you and your manager. It never reads other channels and records no scores.\n\nYou can opt out at any time.'
-      : 'Opt out of KPI insights?\n\nThe agent will stop reading your messages and leave you out of the next report.'
+      ? t(
+          'Opt in to KPI insights?\n\nAn AI agent will read your messages in channels marked "KPI insights on" and note positive contributions for you and your manager. It never reads other channels and records no scores.\n\nYou can opt out at any time.',
+        )
+      : t('Opt out of KPI insights?\n\nThe agent will stop reading your messages and leave you out of the next report.')
     setMenuOpen(false)
     if (!window.confirm(question)) return
     setSavingConsent(true)
@@ -283,7 +291,7 @@ function Me() {
             }}
           >
             <Pencil aria-hidden className="size-4 text-stone-500" />
-            Edit name
+            {t('Edit name')}
           </button>
           <button
             role="menuitemcheckbox"
@@ -291,21 +299,27 @@ function Me() {
             className={menuItem}
             onClick={toggleConsent}
             disabled={!consent.loaded || savingConsent}
-            title="Whether the KPI agent may read your messages in work channels. Off until you turn it on."
+            title={t('Whether the KPI agent may read your messages in work channels. Off until you turn it on.')}
           >
             <ChartColumn aria-hidden className="size-4 text-stone-500" />
-            <span className="flex-1">KPI insights</span>
+            <span className="flex-1">{t('KPI insights')}</span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                 consent.consented ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-500'
               }`}
             >
-              {!consent.loaded ? '…' : consent.consented ? 'Opted in' : 'Not opted in'}
+              {!consent.loaded ? '…' : consent.consented ? t('Opted in') : t('Not opted in')}
             </span>
           </button>
+          <div role="separator" className="my-1 border-t border-stone-200" />
+          <div className="px-2.5 py-1.5">
+            <ThemeSwitch inMenu />
+          </div>
+          <ManglishSwitch inMenu className={`${menuItem} gap-2`} />
+          <div role="separator" className="my-1 border-t border-stone-200" />
           <button role="menuitem" className={`${menuItem} text-rose-700`} onClick={signOut}>
             <LogOut aria-hidden className="size-4" />
-            Sign out
+            {t('Sign out')}
           </button>
         </div>
       )}
@@ -322,7 +336,7 @@ function Me() {
             className={fieldClass}
           />
           <button type="submit" className="text-sm font-semibold text-stone-900 hover:text-stone-600">
-            Save
+            {t('Save')}
           </button>
         </form>
       ) : (
@@ -336,18 +350,18 @@ function Me() {
             <Avatar pubkey={pubkey} name={name} />
             <span
               className={`absolute right-0 bottom-0 size-2 rounded-full ring-[1.5px] ring-white ${STATUS[status].dot}`}
-              title={STATUS[status].label}
+              title={statusLabel}
             />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-semibold text-stone-900">{name}</span>
             {/* Only problems get a line of text; "Connected" is just the green dot. */}
             <span className="sr-only" role="status">
-              {STATUS[status].label}
+              {statusLabel}
             </span>
             {status !== 'ready' && (
               <span aria-hidden className="block truncate text-xs text-stone-500">
-                {STATUS[status].label}
+                {statusLabel}
               </span>
             )}
           </span>

@@ -8,6 +8,7 @@ import {
   type Person,
   type PillarId,
 } from '../lib/kpi'
+import { useT } from '../lib/prefs'
 
 export const dateFmt = (iso: string) =>
   new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
@@ -30,14 +31,17 @@ export function ReviewCard({
   person: Person
   onOpenSource: (e: Evidence) => void
 }) {
+  const t = useT()
   const review = person.review
   const gaps = pillarsWithoutEvidence(report, person)
 
   if (person.evidence.length === 0) {
     return (
       <p className="rounded-lg border border-stone-200 p-4 text-sm text-stone-600">
-        No evidence found for {person.name} in {report.channels.map((c) => `#${c}`).join(', ')} for this period. Their work
-        may happen in other channels or tools, so ask about it directly.
+        {t(
+          'No evidence found for {name} in {channels} for this period. Their work may happen in other channels or tools, so ask about it directly.',
+          { name: person.name, channels: report.channels.map((c) => `#${c}`).join(', ') },
+        )}
       </p>
     )
   }
@@ -53,13 +57,13 @@ export function ReviewCard({
 
           {review.highlights.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Highlights</h4>
+              <h4 className="text-xs font-semibold tracking-wide text-stone-500 uppercase">{t('Highlights')}</h4>
               <ul className="mt-2 space-y-2">
                 {review.highlights.map((h, i) => (
                   <li key={i} className="text-sm text-stone-800">
                     <span className="mr-1.5 inline-flex items-center gap-1.5 font-medium">
                       <Swatch pillar={h.pillar} />
-                      {pillarName(report, h.pillar)}:
+                      {t(pillarName(report, h.pillar))}:
                     </span>
                     {h.text}
                     <span className="ml-1.5 inline-flex flex-wrap gap-1 align-middle">
@@ -84,7 +88,7 @@ export function ReviewCard({
 
           {review.discussion_points.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold tracking-wide text-stone-500 uppercase">For your 1-on-1</h4>
+              <h4 className="text-xs font-semibold tracking-wide text-stone-500 uppercase">{t('For your 1-on-1')}</h4>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-800">
                 {review.discussion_points.map((q, i) => (
                   <li key={i}>{q}</li>
@@ -95,14 +99,15 @@ export function ReviewCard({
         </>
       ) : (
         <p className="text-sm text-stone-600">
-          No written review was generated for this person. The evidence below is still available.
+          {t('No written review was generated for this person. The evidence below is still available.')}
         </p>
       )}
 
       {gaps.length > 0 && (
         <p className="border-t border-stone-100 pt-3 text-xs text-stone-500">
-          No chat evidence yet for {gaps.map((g) => g.name.toLowerCase()).join(', ')}. This work may happen outside
-          these channels, so it's worth asking about.
+          {t("No chat evidence yet for {pillars}. This work may happen outside these channels, so it's worth asking about.", {
+            pillars: gaps.map((g) => t(g.name).toLowerCase()).join(', '),
+          })}
         </p>
       )}
     </div>
@@ -121,6 +126,7 @@ export function EvidenceList({
   onOpenSource: (e: Evidence) => void
   compact?: boolean
 }) {
+  const t = useT()
   return (
     <ol className="space-y-3">
       {items.map((e, i) => (
@@ -128,13 +134,13 @@ export function EvidenceList({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-600">
             <span className="flex items-center gap-1.5 font-medium text-stone-800">
               <Swatch pillar={e.pillar} />
-              {pillarName(report, e.pillar)}
+              {t(pillarName(report, e.pillar))}
             </span>
-            <span>{IMPACT_LABEL[e.impact]}</span>
+            <span>{t(IMPACT_LABEL[e.impact])}</span>
             <time dateTime={e.at}>{dateFmt(e.at)}</time>
             {e.endorsements > 0 && (
               <span>
-                {e.endorsements} teammate {e.endorsements === 1 ? 'reaction' : 'reactions'}
+                {t(e.endorsements === 1 ? '{n} teammate reaction' : '{n} teammate reactions', { n: e.endorsements })}
               </span>
             )}
           </div>
@@ -144,9 +150,9 @@ export function EvidenceList({
               {e.quote}
             </blockquote>
           )}
-          {!compact && <p className="mt-2 text-xs text-stone-500">Why: {e.rationale}</p>}
+          {!compact && <p className="mt-2 text-xs text-stone-500">{t('Why: {reason}', { reason: e.rationale })}</p>}
           <button onClick={() => onOpenSource(e)} className="mt-2 text-sm font-medium text-sky-700 hover:underline">
-            Open in #{e.channel} →
+            {t('Open in #{channel} →', { channel: e.channel })}
           </button>
         </li>
       ))}

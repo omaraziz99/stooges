@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { ArrowUp, CornerDownLeft } from 'lucide-react'
 import { errorText } from '../lib/chat'
+import { useT } from '../lib/prefs'
 
 export type Suggestion = { value: string; label: string; hint?: string }
 
@@ -22,6 +23,7 @@ export function Composer({
   suggest?: (text: string) => Suggestion[]
   disabled?: boolean
 }) {
+  const t = useT()
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -105,7 +107,7 @@ export function Composer({
               </button>
             </li>
           ))}
-          <li className="px-2.5 pt-1 pb-0.5 text-xs text-stone-400">Tab to complete · Enter to run</li>
+          <li className="px-2.5 pt-1 pb-0.5 text-xs text-stone-400">{t('Tab to complete · Enter to run')}</li>
         </ul>
       )}
       {error && <p className="mb-1.5 px-1 text-sm text-rose-600">{error}</p>}
@@ -130,7 +132,7 @@ export function Composer({
             type="submit"
             disabled={!text.trim() || sending || disabled}
             aria-label={sending ? 'Sending' : isCommand ? 'Run' : 'Send'}
-            title={isCommand ? 'Run command' : 'Send'}
+            title={isCommand ? t('Run command') : t('Send')}
             className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-300"
           >
             {isCommand ? <CornerDownLeft aria-hidden className="size-4" /> : <ArrowUp aria-hidden className="size-4" />}

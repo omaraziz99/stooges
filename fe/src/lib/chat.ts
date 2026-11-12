@@ -46,7 +46,16 @@ export type ChannelState = {
   byId: Map<string, NostrEvent>
 }
 
-export const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👀', '✅']
+/**
+ * Custom emoji (NIP-30): sent as ":shortcode:" with an ["emoji", code, url]
+ * tag for other clients. This app draws them only from its own images, never
+ * from a URL in someone's event.
+ */
+export const CUSTOM_EMOJI: Record<string, { src: string; label: string }> = {
+  ':kopi:': { src: `${import.meta.env.BASE_URL}emoji/kopi.png`, label: 'Kopi' },
+}
+
+export const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👀', '✅', ':kopi:']
 
 const chronological = (a: NostrEvent, b: NostrEvent) =>
   a.created_at - b.created_at || (a.id < b.id ? -1 : 1)
@@ -168,6 +177,9 @@ export const react = (client: RelayClient, channelId: string, target: NostrEvent
       ['e', target.id],
       ['p', target.pubkey],
       ['h', channelId],
+      ...(CUSTOM_EMOJI[emoji]
+        ? [['emoji', emoji.slice(1, -1), new URL(CUSTOM_EMOJI[emoji].src, location.origin).href]]
+        : []),
     ],
   })
 

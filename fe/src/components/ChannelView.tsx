@@ -1,5 +1,6 @@
 import { Lock } from 'lucide-react'
 import { errorText, sendMessage, setChannelKpiReview, type Channel, type ChannelState } from '../lib/chat'
+import { useT } from '../lib/prefs'
 import { useNotify, useRelay } from '../state/relay'
 import { Composer, type Suggestion } from './Composer'
 import { MessageList } from './MessageList'
@@ -23,13 +24,17 @@ export function ChannelView({
 }) {
   const { client, pubkey } = useRelay()
   const notify = useNotify()
+  const t = useT()
   const isCreator = channel.creator !== '' && channel.creator === pubkey
 
   const toggleReview = async () => {
     const next = !channel.kpiReview
     const question = next
-      ? `Include #${channel.name} in KPI insights?\n\nThe KPI agent will read messages here from people who have opted in. Everyone in the channel will see a badge saying so.`
-      : `Stop including #${channel.name} in KPI insights?`
+      ? t(
+          'Include #{name} in KPI insights?\n\nThe KPI agent will read messages here from people who have opted in. Everyone in the channel will see a badge saying so.',
+          { name: channel.name },
+        )
+      : t('Stop including #{name} in KPI insights?', { name: channel.name })
     if (!window.confirm(question)) return
     try {
       await setChannelKpiReview(client, channel.id, next)
@@ -43,8 +48,8 @@ export function ChannelView({
       <p className="text-xl font-bold text-stone-900"># {channel.name}</p>
       <p className="text-sm text-stone-500">
         {loaded
-          ? `This is the start of #${channel.name}.${channel.about ? ` ${channel.about}` : ''}`
-          : 'Loading messages…'}
+          ? `${t('This is the start of #{name}.', { name: channel.name })}${channel.about ? ` ${channel.about}` : ''}`
+          : t('Loading messages…')}
       </p>
     </div>
   )
@@ -55,14 +60,14 @@ export function ChannelView({
         <button
           onClick={onOpenSidebar}
           className="rounded p-1.5 text-stone-600 hover:bg-stone-100 md:hidden"
-          aria-label="Open channel list"
+          aria-label={t('Open channel list')}
         >
           ☰
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[17px] font-semibold text-stone-900">
             {channel.kpiReview ? (
-              <Lock aria-label="Work channel" className="mr-1.5 inline size-4 -translate-y-px text-stone-400" />
+              <Lock aria-label={t('Work channel')} className="mr-1.5 inline size-4 -translate-y-px text-stone-400" />
             ) : (
               <span className="mr-1 font-normal text-stone-400">#</span>
             )}
@@ -73,8 +78,8 @@ export function ChannelView({
         <span
           title={
             channel.kpiReview
-              ? 'The KPI agent reads messages here, only from people who have opted in.'
-              : 'The KPI agent never reads this channel.'
+              ? t('The KPI agent reads messages here, only from people who have opted in.')
+              : t('The KPI agent never reads this channel.')
           }
           className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
             channel.kpiReview
@@ -82,11 +87,11 @@ export function ChannelView({
               : 'border-stone-200 bg-stone-50 text-stone-500'
           }`}
         >
-          {channel.kpiReview ? 'KPI insights on' : 'Not reviewed'}
+          {channel.kpiReview ? t('KPI insights on') : t('Not reviewed')}
         </span>
         {isCreator && (
           <button onClick={toggleReview} className="shrink-0 text-xs font-medium text-sky-700 hover:underline">
-            {channel.kpiReview ? 'Turn off' : 'Turn on'}
+            {channel.kpiReview ? t('Turn off') : t('Turn on')}
           </button>
         )}
       </header>
@@ -102,7 +107,7 @@ export function ChannelView({
 
       <Composer
         key={`composer-${channel.id}`}
-        placeholder={`Message #${channel.name}`}
+        placeholder={t('Message #{name}', { name: channel.name })}
         onSend={(text) => sendMessage(client, channel.id, text)}
         onCommand={onCommand}
         suggest={suggest}
