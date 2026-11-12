@@ -1,0 +1,127 @@
+{
+  "_note": "Fictional demo data. The team, project, people, and conversations are made up.",
+  "channel": {
+    "id": "project-orbit",
+    "name": "project-orbit",
+    "about": "Orbit booking app: web, mobile, and API"
+  },
+  "users": ["Maya Chen", "Leo Tan", "Sara Lim", "Ravi Kumar", "Nora Ahmad", "Ben Ortiz"],
+  "messages": [
+    { "author": "Nora Ahmad", "at": "2026-09-01T09:05:00+08:00", "text": "Morning all! Sprint 14 starts today. Board is updated, please pick up your tickets by lunch 🙏" },
+    { "author": "Ben Ortiz", "at": "2026-09-01T09:07:12+08:00", "text": "on it" },
+    {
+      "author": "Nora Ahmad",
+      "at": "2026-09-01T10:30:00+08:00",
+      "text": "Release plan for Orbit 2.0 @channel\n• Code freeze: 10 Oct\n• Staging sign-off: 17 Oct\n• Public launch: 24 Oct\nEach area needs an owner who confirms readiness at the go/no-go on 22 Oct. Reply here to claim one: payments, search, notifications, mobile.",
+      "reactions": [
+        { "emoji": "👍", "by": ["Maya Chen", "Leo Tan", "Sara Lim"] },
+        { "emoji": "🚀", "by": ["Ravi Kumar"] }
+      ],
+      "replies": [
+        { "author": "Leo Tan", "at": "2026-09-01T10:41:00+08:00", "text": "I'll own payments. Will also write the rollback steps for the new provider." },
+        { "author": "Sara Lim", "at": "2026-09-01T10:44:00+08:00", "text": "Mobile is mine." },
+        { "author": "Ravi Kumar", "at": "2026-09-01T10:52:00+08:00", "text": "I can take notifications. The retry queue still drops messages under load, so I'll fix that before freeze and add an alert for it." },
+        { "author": "Maya Chen", "at": "2026-09-01T11:05:00+08:00", "text": "I'll take search. Also flagging a risk: the new ranking needs a reindex that takes ~3h on prod data. We should schedule it the weekend before launch, not launch day." },
+        { "author": "Nora Ahmad", "at": "2026-09-01T11:12:00+08:00", "text": "Great catch Maya, adding the reindex window to the plan for 18 Oct." }
+      ]
+    },
+    { "author": "Ben Ortiz", "at": "2026-09-03T14:20:00+08:00", "text": "https://react.dev/blog" },
+    {
+      "author": "Leo Tan",
+      "at": "2026-09-05T16:10:00+08:00",
+      "text": "Worth a read: https://www.postgresql.org/about/news/\nThe new async I/O in Postgres 18 could cut our booking-history report from ~4s to well under 1s, since it's mostly sequential scans. I'd like to benchmark it on staging next sprint before we decide anything.",
+      "reactions": [
+        { "emoji": "👀", "by": ["Maya Chen", "Ravi Kumar"] },
+        { "emoji": "💯", "by": ["Nora Ahmad"] }
+      ]
+    },
+    {
+      "author": "Ben Ortiz",
+      "at": "2026-09-09T11:02:00+08:00",
+      "text": "Quick question: why does the booking form submit twice on slow networks? I added a loading state but it still happens sometimes 😅",
+      "replies": [
+        {
+          "author": "Maya Chen",
+          "at": "2026-09-09T11:15:00+08:00",
+          "text": "Good question. The loading state only disables the button after React re-renders, so a fast double tap gets two submits in before that. Two fixes:\n1. Guard in the handler with a ref (isSubmitting.current) so the second call returns immediately.\n2. Send an idempotency key with the request, so the API ignores a duplicate even if one slips through.\nWe already support idempotency keys in /bookings, you just need to pass the header."
+        },
+        { "author": "Ben Ortiz", "at": "2026-09-09T11:40:00+08:00", "text": "That worked, thank you! Added both." },
+        { "author": "Maya Chen", "at": "2026-09-09T11:46:00+08:00", "text": "Nice. Can you add a test that fires two submits in a row? That way it can't come back quietly." },
+        { "author": "Ben Ortiz", "at": "2026-09-09T13:20:00+08:00", "text": "Test added in the PR 👍" }
+      ]
+    },
+    { "author": "Sara Lim", "at": "2026-09-12T12:30:00+08:00", "text": "Pizza Friday is back 🍕 who's in?", "reactions": [{ "emoji": "🍕", "by": ["Ben Ortiz", "Leo Tan", "Ravi Kumar"] }] },
+    {
+      "author": "Sara Lim",
+      "at": "2026-09-15T09:30:00+08:00",
+      "text": "Lunch & learn this Thursday 12:30: \"Design tokens in practice\". I'll walk through how we moved the mobile and web themes onto one token file, the mistakes we made, and a checklist for adding new components without breaking dark mode. Slides and recording go in the team drive after.",
+      "reactions": [
+        { "emoji": "🙌", "by": ["Nora Ahmad", "Ben Ortiz"] },
+        { "emoji": "👍", "by": ["Maya Chen"] }
+      ]
+    },
+    { "author": "Sara Lim", "at": "2026-09-18T14:05:00+08:00", "text": "Thanks for coming everyone! Recording and the component checklist are in the drive under Design / Tokens. The checklist is also pinned in this channel." },
+    {
+      "author": "Ravi Kumar",
+      "at": "2026-09-22T08:50:00+08:00",
+      "text": "CI has been flaky all week (about 1 in 5 runs fail on the e2e step). I'm going to take this on. I'll quarantine the flaky tests today and post what I find."
+    },
+    {
+      "author": "Ravi Kumar",
+      "at": "2026-09-24T17:20:00+08:00",
+      "text": "CI update: root cause was two e2e tests sharing the same seeded user, so they raced each other. Each test now creates its own user. 50 runs in a row green ✅ I wrote up how to spot this pattern in docs/testing.md.",
+      "reactions": [
+        { "emoji": "🎉", "by": ["Maya Chen", "Leo Tan", "Sara Lim", "Nora Ahmad"] },
+        { "emoji": "🙏", "by": ["Ben Ortiz"] }
+      ]
+    },
+    { "author": "Leo Tan", "at": "2026-09-26T16:00:00+08:00", "text": "Anyone up for coffee? ☕" },
+    {
+      "author": "Maya Chen",
+      "at": "2026-10-03T21:14:00+08:00",
+      "text": "Heads up: checkout p95 latency jumped from 300ms to 2.4s after this afternoon's deploy. Looking into it now.",
+      "replies": [
+        { "author": "Maya Chen", "at": "2026-10-03T21:31:00+08:00", "text": "Found it. The new promo banner loads each user's coupons one booking at a time, so checkout does 40+ queries instead of 1 (N+1). Rolling the banner back behind its feature flag now." },
+        { "author": "Leo Tan", "at": "2026-10-03T21:35:00+08:00", "text": "I'm around, want me to write the batched query?" },
+        { "author": "Maya Chen", "at": "2026-10-03T21:37:00+08:00", "text": "Yes please. Flag is off and p95 is back to 310ms. Let's ship the batched version tomorrow with a query-count test so this gets caught in CI next time." },
+        { "author": "Leo Tan", "at": "2026-10-04T10:20:00+08:00", "text": "Batched query is up for review. Checkout now runs 2 queries regardless of basket size, and the new test fails if it goes above 3." },
+        { "author": "Maya Chen", "at": "2026-10-04T11:02:00+08:00", "text": "Reviewed and merged. I'll write a short incident note for the team so everyone knows what to look for." }
+      ]
+    },
+    {
+      "author": "Maya Chen",
+      "at": "2026-10-04T15:30:00+08:00",
+      "text": "Incident note: checkout slowdown, 3 Oct.\nWhat happened: an N+1 query in the promo banner took p95 from 300ms to 2.4s for ~25 minutes.\nWhat we changed: batched query (thanks Leo) plus a CI test that fails when checkout runs more than 3 queries.\nTip for reviews: any loop that calls the API or the DB inside a render path is worth a second look.",
+      "reactions": [{ "emoji": "📌", "by": ["Nora Ahmad", "Sara Lim"] }]
+    },
+    { "author": "Ben Ortiz", "at": "2026-10-07T10:15:00+08:00", "text": "is the staging DB down or is it just me" },
+    { "author": "Ravi Kumar", "at": "2026-10-07T10:18:00+08:00", "text": "It was me, restarting it for the upgrade. Back in 2 min, sorry!" },
+    {
+      "author": "Ben Ortiz",
+      "at": "2026-10-14T16:45:00+08:00",
+      "text": "Found this while fixing the date picker: https://developer.mozilla.org/en-US/docs/Web/API/Temporal\nTemporal handles time zones properly, which is exactly what keeps breaking our booking times for users abroad. Polyfill is small. Could we try it in the date picker first?",
+      "reactions": [{ "emoji": "👍", "by": ["Sara Lim", "Maya Chen"] }]
+    },
+    {
+      "author": "Leo Tan",
+      "at": "2026-10-16T11:00:00+08:00",
+      "text": "Proposal for the payments retry logic before launch:\nOption A: retry in the API request (simple, but the user waits up to 10s).\nOption B: queue the retry and email the receipt when it succeeds (more moving parts, but checkout stays fast).\nI lean towards B, since it matches how notifications already work and Ravi's queue fix makes it reliable. Thoughts by Friday?",
+      "replies": [
+        { "author": "Ravi Kumar", "at": "2026-10-16T11:20:00+08:00", "text": "B works for me, the queue can take it now." },
+        { "author": "Nora Ahmad", "at": "2026-10-16T11:35:00+08:00", "text": "B from the product side too, as long as the receipt email says the payment is processing." },
+        { "author": "Leo Tan", "at": "2026-10-17T09:40:00+08:00", "text": "Going with B. Implemented, with the processing message Nora asked for, and added it to the rollback doc." }
+      ]
+    },
+    { "author": "Nora Ahmad", "at": "2026-10-22T15:00:00+08:00", "text": "Go/no-go: all four owners confirmed ready ✅ We launch Friday. Thank you all, this was a big one.", "reactions": [{ "emoji": "🚀", "by": ["Maya Chen", "Leo Tan", "Sara Lim", "Ravi Kumar", "Ben Ortiz"] }] },
+    { "author": "Sara Lim", "at": "2026-10-24T18:30:00+08:00", "text": "We're live!! 🎉🎉" },
+    { "author": "Ben Ortiz", "at": "2026-10-30T10:00:00+08:00", "text": "https://go.dev/blog" },
+    {
+      "author": "Ravi Kumar",
+      "at": "2026-11-03T09:15:00+08:00",
+      "text": "Post-launch: I'm running a 30-minute session Thursday on our new on-call dashboard: which graphs to check first, what each alert means, and how to silence one properly. Useful for anyone joining the rota next month.",
+      "reactions": [{ "emoji": "🙌", "by": ["Ben Ortiz", "Nora Ahmad"] }]
+    },
+    { "author": "Maya Chen", "at": "2026-11-05T13:10:00+08:00", "text": "Who has the meeting room booking for tomorrow's retro?" },
+    { "author": "Nora Ahmad", "at": "2026-11-05T13:12:00+08:00", "text": "Booked, room 4 at 2pm." }
+  ]
+}

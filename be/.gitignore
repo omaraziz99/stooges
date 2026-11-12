@@ -1,0 +1,13 @@
+# SQLite database (messages and the relay's secret key)
+*.db
+*.db-wal
+*.db-shm
+
+# Built binary
+/relay
+
+# Secrets
+.env
+
+# KPI agent result cache
+.kpi-cache.json
