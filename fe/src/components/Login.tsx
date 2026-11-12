@@ -47,16 +47,16 @@ export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: stri
     cn(
       'flex-1 rounded-full py-1.5 text-sm font-medium transition-colors',
       active
-        ? 'bg-white text-[#111] shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06)]'
-        : 'text-neutral-500 hover:text-[#111]',
+        ? 'bg-white text-neutral-900 shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06)]'
+        : 'text-neutral-500 hover:text-neutral-900',
     )
-  const label = 'block text-sm font-medium text-[#111]'
+  const label = 'block text-sm font-medium text-neutral-900'
   const field =
-    'mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[15px] text-[#111] outline-none placeholder:text-neutral-400 focus:border-black/30 disabled:opacity-60'
+    'mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[15px] text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-black/30 disabled:opacity-60'
 
   return (
     <main className="relative isolate flex min-h-dvh w-full items-center justify-center overflow-hidden px-5 py-16">
-      <Suspense fallback={<div aria-hidden className="absolute inset-0 -z-10 bg-[#fafaf9]" />}>
+      <Suspense fallback={<div aria-hidden className="absolute inset-0 -z-10 bg-stone-50" />}>
         <BackgroundCubesGrid className="-z-10" />
       </Suspense>
 
@@ -66,7 +66,7 @@ export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: stri
         transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.1 }}
         className="flex w-full max-w-sm flex-col items-center antialiased"
       >
-        <h1 className="text-[clamp(36px,5vw,52px)] font-medium tracking-[-0.03em] text-[#111]">Stooges</h1>
+        <h1 className="text-[clamp(36px,5vw,52px)] font-medium tracking-[-0.03em] text-neutral-900">Stooges</h1>
 
         <LiquidGlass
           radius={24}
@@ -137,7 +137,7 @@ export function Login({ onLogin }: { onLogin: (secretKey: Uint8Array, name: stri
           <button
             type="submit"
             disabled={busy}
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#111] px-5 text-[15px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-colors hover:bg-neutral-800 disabled:opacity-60"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-neutral-900 px-5 text-[15px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-colors hover:bg-neutral-800 disabled:opacity-60"
           >
             {busy ? (mode === 'signup' ? 'Creating account…' : 'Logging in…') : mode === 'signup' ? 'Create account' : 'Log in'}
           </button>

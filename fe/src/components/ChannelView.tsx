@@ -1,3 +1,4 @@
+import { Lock } from 'lucide-react'
 import { errorText, sendMessage, setChannelKpiReview, type Channel, type ChannelState } from '../lib/chat'
 import { useNotify, useRelay } from '../state/relay'
 import { Composer, type Suggestion } from './Composer'
@@ -60,7 +61,11 @@ export function ChannelView({
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-[17px] font-semibold text-stone-900">
-            <span className="mr-1 font-normal text-stone-400">#</span>
+            {channel.kpiReview ? (
+              <Lock aria-label="Work channel" className="mr-1.5 inline size-4 -translate-y-px text-stone-400" />
+            ) : (
+              <span className="mr-1 font-normal text-stone-400">#</span>
+            )}
             {channel.name}
           </h1>
           {channel.about && <p className="truncate text-xs text-stone-500">{channel.about}</p>}

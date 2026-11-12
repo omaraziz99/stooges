@@ -101,7 +101,7 @@ export function buildChannelState(events: NostrEvent[], me: string): ChannelStat
   return state
 }
 
-/** Latest channel metadata per channel ID, #general first, then by name. */
+/** Latest channel metadata per channel ID, by name. */
 export function buildChannels(events: NostrEvent[]): Channel[] {
   const latest = new Map<string, NostrEvent>()
   for (const e of events) {
@@ -119,7 +119,7 @@ export function buildChannels(events: NostrEvent[]): Channel[] {
       creator: tag(e, 'creator'),
       kpiReview: tag(e, 'kpi') === 'on',
     }))
-    .sort((a, b) => (a.id === 'general' ? -1 : b.id === 'general' ? 1 : a.name.localeCompare(b.name)))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Latest display name per pubkey. */

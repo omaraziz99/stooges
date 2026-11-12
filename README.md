@@ -36,14 +36,21 @@ Open the app, create an account, go to **#project-orbit**, and type `/kpi-maya`.
 
 The agent only reads channels marked **KPI insights on** (a badge in the channel header, set by
 the channel's creator) and only messages from people who opted in (**KPI insights** in the
-sidebar). A new account is not opted in.
+account menu: click your name in the sidebar). A new account is not opted in.
 
 The sample data has three work channels with review on (`#project-orbit`, `#platform-infra`,
 `#design-system`), two private ones the agent never reads (`#lunch-club`, `#weekend-hikers`), and
-seven opted-in people. The seed tool prints secret keys for two of them, an employee (Maya Chen)
-and a manager (Priya Nair), so you can sign in as either. It also prints the `MANAGER_PUBKEYS`
-line that makes Priya a manager: she then sees everyone's report, while Maya sees only her own. These keys are derived from the names, so treat them
-as public.
+seven opted-in people. The seed also creates two email accounts for them, so you can log in as
+either:
+
+| Account type | Name | Email | Password |
+|---|---|---|---|
+| Employee | Maya Chen | `maya@example.com` | `orbit-demo-2026` |
+| Manager | Priya Nair | `priya@example.com` | `orbit-demo-2026` |
+
+A manager sees everyone's KPI report; an employee sees only their own. Everyone who signs up in
+the app is an employee. These logins are in the public repo (`be/seed/demo.json`), so they are
+for demo data only.
 
 ## Deploy
 
@@ -56,10 +63,6 @@ as public.
    - `KPI_AGENT_PUBKEY`: the public key printed by `go run ./cmd/kpi -keygen`
    - `SEED_ON_START=true`: loads the fictional sample channels on start (safe to keep on;
      re-seeding adds no duplicates)
-   - `MANAGER_PUBKEYS`: comma-separated public keys of the managers allowed to read everyone's
-     KPI report. Each manager gets theirs from **Copy public key** in the account menu (click your
-     name in the sidebar). Everyone else can read only their own report; unset, nobody can read the
-     team's.
    - `ALLOWED_ORIGINS` (optional): comma-separated origins allowed to connect, exactly as the browser
      sends them: scheme and host, no path, no trailing slash. For example
      `https://stooges.vercel.app,https://stooges-*.vercel.app,http://localhost:5173`. `*` matches
@@ -92,8 +95,9 @@ platform.
 This is a proof of concept. Before pointing it at real conversations:
 
 - **Access:** anyone who can open the app can read every channel. A person can read only their own
-  KPI report, and the keys in `MANAGER_PUBKEYS` can read everyone's, but every manager sees every
-  person. Restrict who can sign in, and limit each manager to their own reports.
+  KPI report, and manager accounts can read everyone's, but every manager sees every
+  person. There is no screen for making someone a manager yet: it is set in the database
+  (`accounts.role`), as the seed does for the demo manager. Restrict who can sign in, and limit each manager to their own reports.
 - **Accounts:** email and password, with no email verification and no password reset yet. After log-in, the decrypted key stays in the browser's localStorage until sign-out.
 - **AI provider:** the agent sends chat text to Gemini (or Claude). Free-tier Gemini data may be
   used to improve Google's products; use a paid or company-approved account.

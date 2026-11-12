@@ -3,6 +3,68 @@
 /* For people who ask the OS for less transparency: glass falls back to solid. */
 @custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
 
+/* Two themes, switched with data-theme on <html> (see src/lib/prefs.tsx):
+   "teh-susu" (light, the default) and "kopi-o" (dark).
+
+   Components are written once, with the light palette. Kopi O swaps the
+   palette itself: the neutral scale is flipped (white panels become dark
+   coffee, dark text becomes cream) and the few accent tints that are used
+   as backgrounds are darkened. So every screen changes together, with no
+   per-component dark styles to keep in sync. */
+:root {
+  --app-bg: #fff;
+  color-scheme: light;
+}
+
+:root[data-theme="kopi-o"] {
+  color-scheme: dark;
+  --app-bg: oklch(16% 0.012 55);
+
+  /* Panels and cards (bg-white) and overlays (black/5 hovers, shadows' rings). */
+  --color-white: oklch(21% 0.013 55);
+  --color-black: oklch(96% 0.01 80);
+
+  /* Stone, flipped, with a warm coffee tint. */
+  --color-stone-50: oklch(24% 0.013 55);
+  --color-stone-100: oklch(27% 0.014 55);
+  --color-stone-200: oklch(33% 0.014 55);
+  --color-stone-300: oklch(41% 0.014 58);
+  --color-stone-400: oklch(56% 0.014 62);
+  --color-stone-500: oklch(67% 0.013 66);
+  --color-stone-600: oklch(75% 0.012 70);
+  --color-stone-700: oklch(83% 0.01 75);
+  --color-stone-800: oklch(89% 0.009 78);
+  --color-stone-900: oklch(94% 0.008 80);
+  --color-stone-950: oklch(97% 0.006 80);
+
+  --color-neutral-50: oklch(24% 0.01 55);
+  --color-neutral-100: oklch(27% 0.01 55);
+  --color-neutral-200: oklch(33% 0.01 55);
+  --color-neutral-300: oklch(41% 0.01 58);
+  --color-neutral-400: oklch(56% 0.01 62);
+  --color-neutral-500: oklch(67% 0.01 66);
+  --color-neutral-600: oklch(75% 0.008 70);
+  --color-neutral-700: oklch(83% 0.007 75);
+  --color-neutral-800: oklch(89% 0.006 78);
+  --color-neutral-900: oklch(94% 0.005 80);
+  --color-neutral-950: oklch(97% 0.004 80);
+
+  /* Accent tints used as light backgrounds become deep, their text light. */
+  --color-emerald-50: oklch(28% 0.05 165);
+  --color-emerald-100: oklch(32% 0.06 165);
+  --color-emerald-300: oklch(45% 0.09 165);
+  --color-emerald-800: oklch(85% 0.12 165);
+  --color-sky-50: oklch(28% 0.04 240);
+  --color-sky-300: oklch(45% 0.08 240);
+  --color-sky-700: oklch(78% 0.11 235);
+  --color-sky-800: oklch(84% 0.09 235);
+  --color-amber-50: oklch(29% 0.05 70);
+  --color-amber-300: oklch(48% 0.1 75);
+  --color-amber-900: oklch(88% 0.1 85);
+  --color-rose-600: oklch(72% 0.17 17);
+  --color-rose-700: oklch(70% 0.17 17);
+}
+
 html,
 body,
 #root {
@@ -13,11 +75,8 @@ body {
   @apply bg-stone-100 text-stone-900 antialiased;
 }
 
-/* The "window" colour behind the frosted sidebar: warm pale yellow at the
-   top fading to a soft blue, like a macOS sidebar over a desktop wallpaper. */
+/* The "window" colour behind the sidebar and the chat panel, as in Buzz:
+   white in Teh Susu, dark roast in Kopi O. */
 .app-backdrop {
-  background:
-    radial-gradient(60rem 30rem at 0% 0%, rgb(238 232 172 / 0.95), transparent 70%),
-    radial-gradient(50rem 40rem at 10% 100%, rgb(178 199 224 / 0.95), transparent 70%),
-    linear-gradient(180deg, #ebe7c2 0%, #d9ddcf 45%, #c3d0dd 100%);
+  background: var(--app-bg);
 }

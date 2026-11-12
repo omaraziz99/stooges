@@ -65,9 +65,8 @@ function NoReport() {
       <h2 className="text-lg font-semibold text-stone-900">No report for you yet</h2>
       <p className="mt-2 text-sm text-stone-600">
         You see your own report here, and nobody else's. It appears once you have opted in (
-        <strong>KPI insights</strong> in the sidebar), posted in a channel marked <strong>KPI insights on</strong>, and
-        the agent has run. Managers see everyone's: an admin adds a manager's public key (
-        <strong>Copy public key</strong> in the sidebar) to the relay's <code>MANAGER_PUBKEYS</code>.
+        <strong>KPI insights</strong> in your account menu: click your name in the sidebar), posted in a channel marked <strong>KPI insights on</strong>, and
+        the agent has run. Manager accounts see everyone's.
       </p>
       <p className="mt-3 text-sm text-stone-600">
         The KPI agent reads those channels, asks an AI model what each opted-in person visibly contributed, and writes

@@ -56,7 +56,9 @@ function Workspace({ newName }: { newName: string | null }) {
   const { client, pubkey } = useRelay()
   const notify = useNotify()
   const { channels } = useChannels()
-  const [activeId, setActiveId] = useState('general')
+  // Until someone picks a channel, show the first one.
+  const [pickedId, setActiveId] = useState<string | null>(null)
+  const activeId = pickedId ?? channels[0]?.id ?? ''
   const [threadRootId, setThreadRootId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [view, setView] = useState<'chat' | 'kpi'>('chat')
@@ -69,9 +71,9 @@ function Workspace({ newName }: { newName: string | null }) {
     setProfileName(client, newName).catch((err) => notify(errorText(err)))
   }, [client, newName, notify])
 
-  const { events, loaded } = useSubscription([
-    { kinds: [Kind.Message, Kind.Reaction, Kind.Deletion], '#h': [activeId], limit: 500 },
-  ])
+  const { events, loaded } = useSubscription(
+    activeId ? [{ kinds: [Kind.Message, Kind.Reaction, Kind.Deletion], '#h': [activeId], limit: 500 }] : null,
+  )
   const state = useMemo(() => buildChannelState(events, pubkey), [events, pubkey])
 
   // A just-created channel may not be in the list yet; show it by ID meanwhile.
@@ -170,6 +172,13 @@ function Workspace({ newName }: { newName: string | null }) {
           onOpenSource={openSource}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
+      ) : !activeId ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-stone-500">
+          <p>No channels yet. Create one with <strong className="text-stone-700">Add channel</strong> in the sidebar.</p>
+          <button onClick={() => setSidebarOpen(true)} className="text-sm font-medium text-sky-700 hover:underline md:hidden">
+            Open channel list
+          </button>
+        </div>
       ) : (
         <ChannelView
           channel={channel}

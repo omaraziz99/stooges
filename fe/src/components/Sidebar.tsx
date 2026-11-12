@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ChartColumn, Copy, Ellipsis, Hash, LogOut, Pencil, Plus, Search } from 'lucide-react'
+import { ChartColumn, Ellipsis, Hash, Lock, LogOut, Pencil, Plus, Search } from 'lucide-react'
 import { createChannel, errorText, setConsent, setProfileName, slugify, type Channel } from '../lib/chat'
 import { displayName } from '../lib/format'
 import type { Status } from '../lib/relay'
@@ -13,15 +13,15 @@ const STATUS: Record<Status, { dot: string; label: string }> = {
   offline: { dot: 'bg-rose-500', label: 'Offline, retrying…' },
 }
 
-// A light frosted sidebar, like a macOS window sidebar. The colour behind it
-// is the app background (.app-backdrop in index.css).
+// Like Buzz, the sidebar has no panel of its own: it sits on the window
+// background (.app-backdrop in index.css). On phones it slides over the chat.
 const row = (active: boolean) =>
   `flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[15px] transition-colors ${
     active ? 'bg-black/[0.07] font-semibold text-stone-900' : 'text-stone-800 hover:bg-black/[0.04]'
   }`
 const sectionLabel = 'px-2.5 pt-4 pb-1 text-[13px] font-medium text-stone-500'
 const fieldClass =
-  'w-full rounded-lg border border-black/[0.06] bg-white/60 px-2.5 py-1.5 text-sm text-stone-900 placeholder:text-stone-500 outline-none focus:border-black/15 focus:bg-white/85'
+  'w-full rounded-lg border border-black/[0.06] bg-black/[0.03] px-2.5 py-1.5 text-sm text-stone-900 placeholder:text-stone-500 outline-none focus:border-black/15 focus:bg-white'
 
 export function Sidebar({
   channels,
@@ -63,7 +63,7 @@ export function Sidebar({
       {open && <div className="fixed inset-0 z-20 bg-black/20 backdrop-blur-[2px] md:hidden" onClick={onClose} aria-hidden />}
       <nav
         aria-label="Workspace"
-        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-30 w-72 flex-col bg-[#ecebd8]/85 text-stone-800 backdrop-blur-2xl backdrop-saturate-150 reduce-transparency:bg-[#ecebd8] md:static md:flex md:w-64 md:shrink-0 md:bg-white/10`}
+        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-30 w-72 flex-col bg-white text-stone-800 shadow-xl md:static md:flex md:w-64 md:shrink-0 md:bg-transparent md:shadow-none`}
       >
         <div className="shrink-0 px-2.5 pt-3 pb-1">
           <label className="relative block">
@@ -94,7 +94,12 @@ export function Sidebar({
             {shown.map((c) => (
               <li key={c.id}>
                 <button onClick={() => onSelect(c.id)} className={row(c.id === activeId && !kpiActive)} title={c.about || undefined}>
-                  <Hash aria-hidden className="size-4 shrink-0 text-stone-500" />
+                  {/* Work channels (KPI insights on) get a lock, like a private channel in Buzz. */}
+                  {c.kpiReview ? (
+                    <Lock aria-label="Work channel" className="size-4 shrink-0 text-stone-500" />
+                  ) : (
+                    <Hash aria-hidden className="size-4 shrink-0 text-stone-500" />
+                  )}
                   <span className="truncate">{c.name}</span>
                 </button>
               </li>
@@ -215,7 +220,6 @@ function Me() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
-  const [copied, setCopied] = useState(false)
   const consent = useMyConsent()
   const [savingConsent, setSavingConsent] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -263,17 +267,6 @@ function Me() {
     }
   }
 
-  // The public key is what an admin adds to the relay's MANAGER_PUBKEYS.
-  const copyPublicKey = async () => {
-    try {
-      await navigator.clipboard.writeText(pubkey)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      notify('Could not copy to the clipboard.')
-    }
-  }
-
   const menuItem = 'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-stone-800 hover:bg-black/5'
 
   return (
@@ -310,15 +303,6 @@ function Me() {
               {!consent.loaded ? '…' : consent.consented ? 'Opted in' : 'Not opted in'}
             </span>
           </button>
-          <button
-            role="menuitem"
-            className={menuItem}
-            onClick={copyPublicKey}
-            title="Safe to share. An admin uses it to make you a manager."
-          >
-            <Copy aria-hidden className="size-4 text-stone-500" />
-            {copied ? 'Copied!' : 'Copy public key'}
-          </button>
           <button role="menuitem" className={`${menuItem} text-rose-700`} onClick={signOut}>
             <LogOut aria-hidden className="size-4" />
             Sign out
@@ -351,7 +335,7 @@ function Me() {
           <span className="relative">
             <Avatar pubkey={pubkey} name={name} />
             <span
-              className={`absolute right-0 bottom-0 size-2 rounded-full ring-[1.5px] ring-[#e3e6e0] ${STATUS[status].dot}`}
+              className={`absolute right-0 bottom-0 size-2 rounded-full ring-[1.5px] ring-white ${STATUS[status].dot}`}
               title={STATUS[status].label}
             />
           </span>

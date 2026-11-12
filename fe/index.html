@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stooges Chat</title>
+    <script>
+      // Apply the saved theme before the first paint, so Kopi O never flashes white.
+      try {
+        if (localStorage.getItem('stooges-theme') === 'kopi-o') document.documentElement.dataset.theme = 'kopi-o'
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
