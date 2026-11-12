@@ -25,9 +25,9 @@ import (
 )
 
 // Provision creates an email account for an existing chat key, exactly as
-// signing up in the app would, and sets its type. If the email is already
-// registered it only updates the type, so re-running is safe. created reports
-// whether a new account was made.
+// signing up in the app would, and sets its type. If the seed made the account
+// before, its password and type are reset, so re-running is safe and the seed
+// file's password always works. created reports whether a new account was made.
 func Provision(ctx context.Context, st *store.Store, email, password string, priv *btcec.PrivateKey, role string) (created bool, err error) {
 	email = normalizeEmail(email)
 	if !validEmail(email) {
@@ -36,11 +36,12 @@ func Provision(ctx context.Context, st *store.Store, email, password string, pri
 	if len(password) < 8 {
 		return false, fmt.Errorf("password for %s is shorter than 8 characters", email)
 	}
-	if _, ok, err := st.GetAccount(ctx, email); err != nil {
+	existing, exists, err := st.GetAccount(ctx, email)
+	if err != nil {
 		return false, err
-	} else if ok {
-		_, err := st.SetRole(ctx, email, role)
-		return false, err
+	}
+	if exists && existing.PubKey != nostr.PubKeyHex(priv) {
+		return false, fmt.Errorf("%s already belongs to a different account; not changing it", email)
 	}
 	authKey, err := AuthKey(email, password)
 	if err != nil {
@@ -52,6 +53,12 @@ func Provision(ctx context.Context, st *store.Store, email, password string, pri
 	}
 	ncryptsec, err := EncryptKey(priv.Serialize(), password)
 	if err != nil {
+		return false, err
+	}
+	// Already there (an earlier seed): reset its password and type, so the
+	// password in the seed file always works.
+	if exists {
+		_, err := st.SetCredentials(ctx, email, string(hash), ncryptsec, role)
 		return false, err
 	}
 	acct := store.Account{Email: email, PubKey: nostr.PubKeyHex(priv), AuthHash: string(hash), Ncryptsec: ncryptsec, Role: role}

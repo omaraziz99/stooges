@@ -391,6 +391,18 @@ func (s *Store) GetAccount(ctx context.Context, email string) (a Account, ok boo
 	return a, err == nil, err
 }
 
+// SetCredentials replaces an account's login hash, encrypted key and type;
+// ok is false if there is no such account.
+func (s *Store) SetCredentials(ctx context.Context, email, authHash, ncryptsec, role string) (ok bool, err error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE accounts SET auth_hash = ?, ncryptsec = ?, role = ? WHERE email = ?`, authHash, ncryptsec, role, email)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // SetRole changes an account's type; ok is false if there is no such account.
 func (s *Store) SetRole(ctx context.Context, email, role string) (ok bool, err error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE accounts SET role = ? WHERE email = ?`, role, email)

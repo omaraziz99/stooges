@@ -12,8 +12,8 @@
     "Daniel Wong"
   ],
   "demo_accounts": [
-    { "name": "Maya Chen", "email": "maya@example.com", "password": "orbit-demo-2026", "role": "employee" },
-    { "name": "Priya Nair", "email": "priya@example.com", "password": "orbit-demo-2026", "role": "manager" }
+    { "name": "Maya Chen", "email": "maya@example.com", "password": "password", "role": "employee" },
+    { "name": "Priya Nair", "email": "priya@example.com", "password": "password", "role": "manager" }
   ],
   "channels": [
     {
