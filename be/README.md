@@ -43,15 +43,19 @@ What it supports:
   removed on start, with its messages). Kind `9007` creates a channel,
   and the relay answers with a relay-signed kind `39000` metadata event.
 - **Allowed kinds**: `0` profile, `9` message (threads via `["e", root, "", "root"]`), `7` reaction,
-  `5` delete own events, `9002` turn KPI review of a channel on or off (creator only), and `30078`
-  with `d=kpi-report` (KPI agent only) or `d=kpi-consent` (a person's own opt-in). Everything else
-  is refused.
+  `5` delete own events, `9002` turn KPI review of a channel on or off (creator only), `30078`
+  with `d=kpi-report` (KPI agent only) or `d=kpi-consent` (a person's own opt-in), and `31923`
+  performance review bookings (managers only). Everything else is refused.
+- **Review bookings**: a NIP-52 time-based calendar event (kind `31923`) with a `d` tag, exactly
+  one `p` tag (the person), `start` and optional `end` (unix seconds), a `title` and a note as
+  content. Republishing the same `d` reschedules; adding `["status", "cancelled"]` cancels.
 - **Work channels**: a channel is reviewed by the KPI agent only if its creator marks it, with
   `["kpi", "on"]` at creation or a kind `9002` later. The relay-signed metadata then carries the
   same tag, which the app shows as a badge and a lock icon.
-- **Reading**: everything is public except KPI reports. The team report (`d=kpi-report`) is sent
-  only to signed-in manager accounts (account type, `accounts.role = 'manager'`). Each person's own report
-  (`d=kpi-report:<their pubkey>`) is sent to that person and to managers, nobody else.
+- **Reading**: everything is public except KPI reports and review bookings. The team report
+  (`d=kpi-report`) is sent only to signed-in manager accounts (account type,
+  `accounts.role = 'manager'`). Each person's own report (`d=kpi-report:<their pubkey>`) and each
+  booking (to the person in its `p` tag) is sent to that person and to managers, nobody else.
 - **Deleting a channel**: kind `9008` with `["h", id]`, from any signed-in member. The channel,
   its metadata and all its messages and reactions are removed, and the relay publishes a replacement
   metadata event tagged `["deleted"]` so connected clients drop it live.
@@ -89,8 +93,10 @@ channels are created with KPI review on and two private ones with it off. Re-run
 duplicates. It also creates the demo email accounts listed under `demo_accounts` in
 `seed/demo.json` (an employee, Maya Chen, and a manager, Priya Nair). Accounts live in the relay's
 database, not in events, so the seed writes them to the relay's SQLite file (`-db`, default
-`DB_PATH` or `stooges.db`); against a remote relay it skips them. In the Docker image this happens
-automatically with `SEED_ON_START=true`.
+`DB_PATH` or `stooges.db`); against a remote relay it skips them, and the review bookings too.
+Those (`reviews` in `seed/demo.json`) are booked by the manager, in days from the day the seed
+runs; a booking already there is left alone. In the Docker image this happens automatically with
+`SEED_ON_START=true`.
 
 ## KPI agent
 
@@ -127,9 +133,10 @@ How it works:
    everyone and open a review with `/kpi-<name>`; everyone else sees only their own.
 
 With `-sample`, keyword rules stand in for the model, so the dashboard can be demoed without an
-API key. Every item says which keyword matched, and the app marks the report as a sample.
+API key. Every item says which keyword it matched.
 
 It is quota-friendly. The sample data takes about 5 requests plus one per person (about 12 in
 total). Results are cached in `.kpi-cache.json` (git-ignored), so re-runs only send new or changed
-conversations. If the API quota runs out, the run stops at once, keeps its progress, and the next
-run finishes the rest.
+conversations. `KPI_CACHE` sets another path; the Docker image keeps the cache on the volume, at
+`/data/.kpi-cache.json`, so it survives rebuilds. If the API quota runs out, the run stops at once,
+keeps its progress, and the next run finishes the rest.

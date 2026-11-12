@@ -45,7 +45,7 @@ func TestEvidenceMustUseTheContributorsLevel(t *testing.T) {
 			t.Errorf("%s: level %q, want %q", p.Name, p.Level, want)
 		}
 	}
-	if r.Team.Counts["se_problem_solving"] != 1 || r.Team.Counts["sse_standards"] != 1 || r.Framework == "" || len(r.Levels) != 2 {
+	if r.Team.Counts["se_problem_solving"] != 1 || r.Team.Counts["sse_standards"] != 1 || len(r.Levels) != 2 {
 		t.Fatalf("unexpected report summary: %+v", r.Team.Counts)
 	}
 }

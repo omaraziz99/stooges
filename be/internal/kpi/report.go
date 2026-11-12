@@ -19,7 +19,6 @@ type Report struct {
 	To            time.Time    `json:"to"`
 	Conversations int          `json:"conversations"`
 	Skipped       []string     `json:"skipped,omitempty"`
-	Framework     string       `json:"framework"`
 	Levels        []LevelInfo  `json:"levels"`
 	Pillars       []PillarInfo `json:"pillars"` // every KPI item of every level
 	Team          TeamSummary  `json:"team"`
@@ -203,7 +202,6 @@ func BuildReport(units []Unit, evidence []Evidence, model string, channels []str
 		Channels:      channels,
 		Conversations: len(units),
 		Skipped:       skipped,
-		Framework:     FrameworkName,
 		Levels:        Levels,
 		Pillars:       Pillars,
 	}

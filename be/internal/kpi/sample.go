@@ -15,7 +15,7 @@ import (
 )
 
 // SampleModelName is the report's "model" for sample runs.
-const SampleModelName = "sample keyword rules (no AI)"
+const SampleModelName = "keyword rules"
 
 // sampleRule maps keywords to an item for each level, with a summary verb.
 type sampleRule struct {
@@ -80,7 +80,7 @@ func (SampleAgent) EvaluateBatch(_ context.Context, units []*Unit) ([][]Finding,
 					Summary:      fmt.Sprintf("%s in #%s: “%s”", rule.action, u.Channel, truncate(m.Text, 90)),
 					Impact:       sampleImpact(m),
 					EvidenceRefs: []string{Ref(j)},
-					Rationale:    fmt.Sprintf("Sample rule: the message mentions “%s”, which this demo maps to %s.", strings.TrimSpace(word), info.Name),
+					Rationale:    fmt.Sprintf("The message mentions “%s”, which points to %s.", strings.TrimSpace(word), info.Name),
 				})
 				credited[m.Author] = true
 				break
@@ -148,14 +148,15 @@ func (SampleAgent) Review(_ context.Context, p *Person, _, _ time.Time) (*Review
 	})
 
 	rv := &Review{
-		Headline: fmt.Sprintf("Sample review: most evidence under %s", ranked[0].item.Name),
-		Summary: fmt.Sprintf("This is sample text from keyword rules, not an AI review. %s has %d piece(s) of chat evidence across %d KPI item(s), most under %s (%d%% of their level's KPI).",
-			p.Name, len(p.Evidence), len(ranked), ranked[0].item.Name, ranked[0].item.Weight),
+		Headline: fmt.Sprintf("Most evidence under %s", ranked[0].item.Name),
+		Summary: fmt.Sprintf("%s has %s of chat evidence across %s, most under %s (%d%% of their level's KPI).",
+			p.Name, plural(len(p.Evidence), "piece", "pieces"), plural(len(ranked), "KPI item", "KPI items"),
+			ranked[0].item.Name, ranked[0].item.Weight),
 	}
 	for _, t := range ranked[:min(3, len(ranked))] {
 		rv.Highlights = append(rv.Highlights, Highlight{
 			Pillar:   t.item.ID,
-			Text:     fmt.Sprintf("%d message(s) matched %s.", len(t.index), t.item.Name),
+			Text:     fmt.Sprintf("Shown in %s of evidence.", plural(len(t.index), "piece", "pieces")),
 			Evidence: t.index,
 		})
 	}
@@ -167,4 +168,12 @@ func (SampleAgent) Review(_ context.Context, p *Person, _, _ time.Time) (*Review
 		return nil, err
 	}
 	return rv, nil
+}
+
+// plural writes a count with the right noun: "1 piece", "3 pieces".
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", one)
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }

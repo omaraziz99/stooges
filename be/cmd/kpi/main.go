@@ -17,6 +17,7 @@
 //	GEMINI_API_KEY, GEMINI_MODEL   for -provider gemini (default)
 //	ANTHROPIC_API_KEY              for -provider claude
 //	KPI_AGENT_SECRET               the agent's signing key (from -keygen)
+//	KPI_CACHE                      result cache file (default .kpi-cache.json; the Docker image keeps it on /data)
 package main
 
 import (
@@ -45,7 +46,8 @@ func main() {
 	model := flag.String("model", "", "model name (default: GEMINI_MODEL or "+kpi.DefaultGeminiModel+" for gemini, "+kpi.DefaultModel+" for claude)")
 	batch := flag.Int("batch", 8, "conversations sent per request (fewer requests = less quota)")
 	parallel := flag.Int("parallel", 2, "requests in flight at once")
-	cachePath := flag.String("cache", ".kpi-cache.json", `result cache so re-runs only send new conversations ("" to disable)`)
+	cachePath := flag.String("cache", firstNonEmpty(os.Getenv("KPI_CACHE"), ".kpi-cache.json"),
+		`result cache so re-runs only send new conversations ("" to disable; default: KPI_CACHE)`)
 	dryRun := flag.Bool("dry-run", false, "show the conversations that would be sent, without calling the model")
 	keygen := flag.Bool("keygen", false, "print a new agent key pair and exit")
 	sample := flag.Bool("sample", false, "build a sample report from keyword rules instead of an AI model (for demos; no API key needed)")

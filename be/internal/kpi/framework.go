@@ -15,9 +15,6 @@ import (
 	"strings"
 )
 
-// FrameworkName is shown on the dashboard.
-const FrameworkName = "Orbit Engineering KPI (sample)"
-
 // Level IDs.
 const (
 	LevelEngineer = "se"  // Software Engineer

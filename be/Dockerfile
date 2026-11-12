@@ -22,7 +22,9 @@ COPY seed /app/seed
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 WORKDIR /app
-# On Railway, mount a volume at /data so messages survive redeploys.
-ENV DB_PATH=/data/stooges.db
+# On Railway, mount a volume at /data so messages survive redeploys. The KPI
+# agent's result cache lives there too, so re-runs in the container (as with
+# docker compose) only send new conversations to the AI, even after a rebuild.
+ENV DB_PATH=/data/stooges.db KPI_CACHE=/data/.kpi-cache.json
 EXPOSE 7777
 CMD ["docker-entrypoint.sh"]
