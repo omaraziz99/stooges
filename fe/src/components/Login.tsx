@@ -12,12 +12,30 @@ const BackgroundCubesGrid = lazy(() =>
   import('./ui/background-cubes-grid').then((m) => ({ default: m.BackgroundCubesGrid })),
 )
 
+const LAST_EMAIL_KEY = 'stooges-last-email'
+
+function loadLastEmail() {
+  try {
+    return localStorage.getItem(LAST_EMAIL_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function saveLastEmail(email: string) {
+  try {
+    localStorage.setItem(LAST_EMAIL_KEY, email.trim().toLowerCase())
+  } catch {
+    // Storage blocked: the field just starts empty next time.
+  }
+}
+
 const EASE_OUT = [0.215, 0.61, 0.355, 1] as const
 
 /** Create an account (name, email, password) or log in (email, password). */
 export function Login({
   onLogin,
-  initialMode = 'signup',
+  initialMode = 'login',
 }: {
   onLogin: (secretKey: Uint8Array, name: string | null) => void
   /** Which tab to start on: #/signup ("Try now") or #/login. */
@@ -28,7 +46,8 @@ export function Login({
   const { theme } = usePrefs()
   const [mode, setMode] = useState<'signup' | 'login'>(initialMode)
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  // The last email used here, so logging in again is one field.
+  const [email, setEmail] = useState(loadLastEmail)
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,8 +61,9 @@ export function Login({
     }
     setBusy(true)
     try {
-      if (mode === 'signup') onLogin(await signUp(email, password), name.trim())
-      else onLogin(await logIn(email, password), null)
+      const sk = mode === 'signup' ? await signUp(email, password) : await logIn(email, password)
+      saveLastEmail(email)
+      onLogin(sk, mode === 'signup' ? name.trim() : null)
     } catch (err) {
       // Server messages are English; known ones have a Manglish version.
       setError(t(err instanceof Error ? err.message : String(err)))
@@ -113,11 +133,11 @@ export function Login({
         >
         <form onSubmit={submit} className="p-5">
           <div className="flex gap-1 rounded-full bg-black/[0.04] p-1" role="tablist">
-            <button type="button" role="tab" aria-selected={mode === 'signup'} className={tab(mode === 'signup')} onClick={() => switchMode('signup')}>
-              {t('Create account')}
-            </button>
             <button type="button" role="tab" aria-selected={mode === 'login'} className={tab(mode === 'login')} onClick={() => switchMode('login')}>
               {t('Log in')}
+            </button>
+            <button type="button" role="tab" aria-selected={mode === 'signup'} className={tab(mode === 'signup')} onClick={() => switchMode('signup')}>
+              {t('Create account')}
             </button>
           </div>
 
@@ -140,12 +160,14 @@ export function Login({
             <label className={label}>
               {t('Email')}
               <input
-                autoFocus={mode === 'login'}
+                autoFocus={mode === 'login' && !email}
                 type="email"
+                name="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
+                // "username" lets the browser's password manager save and autofill this login.
+                autoComplete={mode === 'login' ? 'username' : 'email'}
                 placeholder="you@company.com"
                 disabled={busy}
                 className={field}
@@ -155,6 +177,8 @@ export function Login({
               {t('Password')}
               <input
                 type="password"
+                name="password"
+                autoFocus={mode === 'login' && !!email}
                 required
                 minLength={mode === 'signup' ? MIN_PASSWORD : undefined}
                 value={password}

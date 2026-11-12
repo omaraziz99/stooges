@@ -67,8 +67,8 @@ either:
 
 | Account type | Name | Email | Password |
 |---|---|---|---|
-| Employee | Maya Chen | `maya@example.com` | `orbit-demo-2026` |
-| Manager | Priya Nair | `priya@example.com` | `orbit-demo-2026` |
+| Employee | Maya Chen | `maya@example.com` | `password` |
+| Manager | Priya Nair | `priya@example.com` | `password` |
 
 A manager sees everyone's KPI report; an employee sees only their own. Everyone who signs up in
 the app is an employee. These logins are in the public repo (`be/seed/demo.json`), so they are
