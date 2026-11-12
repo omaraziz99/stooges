@@ -68,7 +68,6 @@ export type KpiReport = {
   to: string
   conversations: number
   skipped?: string[]
-  framework: string
   levels: Level[]
   /** Every KPI item of every level. */
   pillars: Pillar[]
@@ -92,7 +91,7 @@ export const levelTitle = (report: KpiReport, level: string) => report.levels.fi
 export function itemColor(report: KpiReport, id: PillarId) {
   const item = report.pillars.find((p) => p.id === id)
   const slot = item ? itemsFor(report, item.level).indexOf(item) : -1
-  return slot >= 0 ? `var(--series-${(slot % 7) + 1})` : 'var(--color-stone-400)'
+  return slot >= 0 ? `var(--series-${(slot % 7) + 1})` : 'var(--color-gray-400)'
 }
 
 export const IMPACT_LABEL: Record<Impact, string> = { low: 'Low impact', medium: 'Medium impact', high: 'High impact' }

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChannelView } from './components/ChannelView'
 import type { Suggestion } from './components/Composer'
-import { KpiDashboard } from './components/KpiDashboard'
 import { KpiReviewPanel } from './components/KpiReviewPanel'
 import { commandFor, findPeople, parseKpiCommand, type Evidence } from './lib/kpi'
 import { Login } from './components/Login'
 import { Sidebar } from './components/Sidebar'
+import { TeamDashboard } from './components/TeamDashboard'
 import { ThreadPanel } from './components/ThreadPanel'
 import { buildChannelState, errorText, Kind, setProfileName } from './lib/chat'
 import { clearSecretKey, loadSecretKey, saveSecretKey } from './lib/keys'
@@ -24,19 +24,25 @@ import {
 export default function App() {
   const [secretKey, setSecretKey] = useState(() => loadSecretKey())
   const [newName, setNewName] = useState<string | null>(null)
+  const [hash, navigate] = useHashRoute()
 
   const signOut = useCallback(() => {
     clearSecretKey()
     setSecretKey(null)
   }, [])
 
+  // Signed out: the login page, on Log in at #/login and on Create account otherwise.
   if (!secretKey) {
+    const mode = hash === '#/login' ? 'login' : 'signup'
     return (
       <Login
+        key={mode}
+        initialMode={mode}
         onLogin={(sk, name) => {
           saveSecretKey(sk)
           setNewName(name)
           setSecretKey(sk)
+          navigate('') // into the chat, without #/login in the address
         }}
       />
     )
@@ -64,7 +70,9 @@ function Workspace({ newName }: { newName: string | null }) {
   const activeId = (pickedId && !deleted.has(pickedId) ? pickedId : null) ?? channels[0]?.id ?? ''
   const [threadRootId, setThreadRootId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [view, setView] = useState<'chat' | 'kpi'>('chat')
+  const [hash, navigate] = useHashRoute()
+  const team = hash.match(/^#\/team(?:\/(.+))?$/) // the team dashboard: #/team or #/team/<name>
+  const openTeam = (name?: string | null) => navigate(name ? `#/team/${encodeURIComponent(name)}` : '#/team')
 
   // A brand-new account publishes its display name once (queued until login completes).
   const sentName = useRef(false)
@@ -90,14 +98,12 @@ function Workspace({ newName }: { newName: string | null }) {
 
   const report = useKpiReport()
   const [reviewName, setReviewName] = useState<string | null>(null) // open /kpi-<name> panel
-  const [kpiSelected, setKpiSelected] = useState<string | null>(null) // person open in the dashboard
   const reviewPerson = report?.people.find((p) => p.name === reviewName) ?? null
 
   const selectChannel = (id: string) => {
     setActiveId(id)
     setThreadRootId(null)
     setSidebarOpen(false)
-    setView('chat')
   }
 
   const openThread = (id: string) => {
@@ -110,7 +116,7 @@ function Workspace({ newName }: { newName: string | null }) {
     setActiveId(e.channel)
     setReviewName(null)
     setThreadRootId(e.unit_kind === 'thread' ? e.unit_id : null)
-    setView('chat')
+    navigate('')
   }
 
   // "/kpi-maya", "/kpi maya chen", or bare "/kpi". Never posted to the channel.
@@ -121,8 +127,7 @@ function Workspace({ newName }: { newName: string | null }) {
     if (report === undefined) throw new Error(t('The KPI report is still loading. Try again in a moment.'))
     if (!report) throw new Error(t('No KPI report for you yet. Opt in from the sidebar; it appears after the agent next runs.'))
     if (!cmd.query) {
-      setKpiSelected(null)
-      setView('kpi')
+      openTeam()
       return
     }
     const matches = findPeople(report.people, cmd.query)
@@ -159,6 +164,18 @@ function Workspace({ newName }: { newName: string | null }) {
       }))
   }
 
+  if (team) {
+    return (
+      <TeamDashboard
+        report={report}
+        selected={team[1] ? decodeURIComponent(team[1]) : null}
+        onSelect={openTeam}
+        onOpenSource={openSource}
+        onBackToChat={() => navigate('')}
+      />
+    )
+  }
+
   return (
     <div className="app-backdrop flex h-dvh overflow-hidden">
       <Sidebar
@@ -167,29 +184,20 @@ function Workspace({ newName }: { newName: string | null }) {
         onSelect={selectChannel}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        kpiActive={view === 'kpi'}
         onOpenKpi={() => {
-          setView('kpi')
+          openTeam()
           setSidebarOpen(false)
         }}
       />
       <div className="flex min-w-0 flex-1 overflow-hidden bg-white md:my-2 md:mr-2 md:rounded-2xl md:shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.25)] md:ring-1 md:ring-black/5">
-      {view === 'kpi' ? (
-        <KpiDashboard
-          report={report}
-          selected={kpiSelected}
-          onSelect={setKpiSelected}
-          onOpenSource={openSource}
-          onOpenSidebar={() => setSidebarOpen(true)}
-        />
-      ) : !activeId ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-stone-500">
+      {!activeId ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-gray-500">
           <p>
             {t.rich('No channels yet. Create one with {add} in the sidebar.', {
-              add: <strong className="text-stone-700">{t('Add channel')}</strong>,
+              add: <strong className="text-gray-700">{t('Add channel')}</strong>,
             })}
           </p>
-          <button onClick={() => setSidebarOpen(true)} className="text-sm font-medium text-sky-700 hover:underline md:hidden">
+          <button onClick={() => setSidebarOpen(true)} className="text-sm font-medium text-brand-700 hover:underline md:hidden">
             {t('Open channel list')}
           </button>
         </div>
@@ -204,20 +212,19 @@ function Workspace({ newName }: { newName: string | null }) {
           suggest={suggest}
         />
       )}
-      {view === 'chat' && report && reviewPerson && (
+      {report && reviewPerson && (
         <KpiReviewPanel
           report={report}
           person={reviewPerson}
           onClose={() => setReviewName(null)}
           onOpenSource={openSource}
           onOpenProfile={() => {
-            setKpiSelected(reviewPerson.name)
             setReviewName(null)
-            setView('kpi')
+            openTeam(reviewPerson.name)
           }}
         />
       )}
-      {view === 'chat' && !reviewPerson && threadRootId && (
+      {!reviewPerson && threadRootId && (
         <ThreadPanel
           channelId={activeId}
           rootId={threadRootId}
@@ -228,4 +235,32 @@ function Workspace({ newName }: { newName: string | null }) {
       </div>
     </div>
   )
+}
+
+/**
+ * The URL hash, kept in sync with the back and forward buttons. It gives the
+ * team dashboard its own address (#/team) with no router and no server
+ * rewrites. navigate('') goes back to the chat without leaving a bare '#'.
+ */
+function useHashRoute() {
+  const [hash, setHash] = useState(() => window.location.hash)
+  useEffect(() => {
+    const sync = () => setHash(window.location.hash)
+    window.addEventListener('hashchange', sync)
+    window.addEventListener('popstate', sync)
+    return () => {
+      window.removeEventListener('hashchange', sync)
+      window.removeEventListener('popstate', sync)
+    }
+  }, [])
+  const navigate = useCallback((next: string) => {
+    if (next === window.location.hash) return
+    if (next) {
+      window.location.hash = next
+    } else {
+      window.history.pushState(null, '', window.location.pathname + window.location.search)
+      setHash('')
+    }
+  }, [])
+  return [hash, navigate] as const
 }

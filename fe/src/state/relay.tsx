@@ -4,6 +4,7 @@ import { RELAY_URL } from '../lib/config'
 import { RelayClient, type Filter, type NostrEvent, type Status } from '../lib/relay'
 import { buildChannels, buildProfiles, CONSENT_TAG, Kind, type Profile } from '../lib/chat'
 import { parseReport, REPORT_KIND, REPORT_TAG, type KpiReport } from '../lib/kpi'
+import { activeBookings, REVIEW_KIND, type Booking } from '../lib/reviews'
 
 type RelayContextValue = {
   client: RelayClient
@@ -120,6 +121,16 @@ export function useKpiReport(): KpiReport | null | undefined {
   }, [events, loaded, mine])
 }
 
+/**
+ * Performance review bookings this account may see: every booking for a
+ * manager, only your own otherwise (the relay decides). Cancelled ones are
+ * left out. Live as managers book, reschedule or cancel.
+ */
+export function useReviewBookings(): Booking[] {
+  const { events } = useSubscription([{ kinds: [REVIEW_KIND] }])
+  return useMemo(() => activeBookings(events), [events])
+}
+
 /** The signed-in person's opt-in to KPI insights, and when they last changed it. */
 export function useMyConsent() {
   const { pubkey } = useRelay()
@@ -168,10 +179,10 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
       {message && (
         <div
           role="alert"
-          className="fixed bottom-4 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg bg-stone-900 px-4 py-2.5 text-sm text-white shadow-lg"
+          className="fixed bottom-4 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg bg-gray-900 px-4 py-2.5 text-sm text-white shadow-lg"
         >
           <span>{message}</span>
-          <button onClick={() => setMessage(null)} className="text-stone-400 hover:text-white" aria-label="Dismiss">
+          <button onClick={() => setMessage(null)} className="text-gray-400 hover:text-white" aria-label="Dismiss">
             ✕
           </button>
         </div>

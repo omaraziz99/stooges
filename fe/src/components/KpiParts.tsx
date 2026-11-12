@@ -13,7 +13,7 @@ import { useT } from '../lib/prefs'
 export const dateFmt = (iso: string) =>
   new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
 
-const shortDate = (iso: string) => new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })
+export const shortDate = (iso: string) => new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })
 
 export function Swatch({ report, pillar }: { report: KpiReport; pillar: PillarId }) {
   return (
@@ -23,7 +23,7 @@ export function Swatch({ report, pillar }: { report: KpiReport; pillar: PillarId
 
 export const pillarName = (report: KpiReport, id: PillarId) => report.pillars.find((p) => p.id === id)?.name ?? id
 
-/** The AI-drafted review: headline, summary, highlights linked to evidence, 1-on-1 questions. */
+/** The AI-drafted review: headline, summary, highlights linked to evidence, discussion points. */
 export function ReviewCard({
   report,
   person,
@@ -39,7 +39,7 @@ export function ReviewCard({
 
   if (person.evidence.length === 0) {
     return (
-      <p className="rounded-lg border border-stone-200 p-4 text-sm text-stone-600">
+      <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-600">
         {t(
           'No evidence found for {name} in {channels} for this period. Their work may happen in other channels or tools, so ask about it directly.',
           { name: person.name, channels: report.channels.map((c) => `#${c}`).join(', ') },
@@ -49,20 +49,20 @@ export function ReviewCard({
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-stone-200 p-4">
+    <div className="space-y-4 rounded-lg border border-gray-200 p-4">
       {review ? (
         <>
           <div>
-            <p className="font-semibold text-stone-900">{review.headline}</p>
-            <p className="mt-1 text-sm leading-relaxed text-stone-700">{review.summary}</p>
+            <p className="font-semibold text-gray-900">{review.headline}</p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-700">{review.summary}</p>
           </div>
 
           {review.highlights.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold tracking-wide text-stone-500 uppercase">{t('Highlights')}</h4>
+              <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">{t('Highlights')}</h4>
               <ul className="mt-2 space-y-2">
                 {review.highlights.map((h, i) => (
-                  <li key={i} className="text-sm text-stone-800">
+                  <li key={i} className="text-sm text-gray-800">
                     <span className="mr-1.5 inline-flex items-center gap-1.5 font-medium">
                       <Swatch report={report} pillar={h.pillar} />
                       {t(pillarName(report, h.pillar))}:
@@ -75,7 +75,7 @@ export function ReviewCard({
                           <button
                             key={idx}
                             onClick={() => onOpenSource(person.evidence[idx])}
-                            className="rounded border border-stone-200 px-1.5 text-xs text-sky-700 hover:border-sky-300"
+                            className="rounded border border-gray-200 px-1.5 text-xs text-brand-700 hover:border-brand-300"
                             title={person.evidence[idx].summary}
                           >
                             {shortDate(person.evidence[idx].at)}
@@ -90,8 +90,8 @@ export function ReviewCard({
 
           {review.discussion_points.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold tracking-wide text-stone-500 uppercase">{t('For your 1-on-1')}</h4>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-800">
+              <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">{t('Discussion points')}</h4>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800">
                 {review.discussion_points.map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
@@ -100,13 +100,13 @@ export function ReviewCard({
           )}
         </>
       ) : (
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-gray-600">
           {t('No written review was generated for this person. The evidence below is still available.')}
         </p>
       )}
 
       {gaps.length > 0 && (
-        <p className="border-t border-stone-100 pt-3 text-xs text-stone-500">
+        <p className="border-t border-gray-100 pt-3 text-xs text-gray-500">
           {t("No chat evidence yet for {pillars}. This work may happen outside these channels, so it's worth asking about.", {
             pillars: gaps.map((g) => t(g.name).toLowerCase()).join(', '),
           })}
@@ -132,9 +132,9 @@ export function EvidenceList({
   return (
     <ol className="space-y-3">
       {items.map((e, i) => (
-        <li key={`${e.unit_id}-${i}`} className={`rounded-lg border border-stone-200 ${compact ? 'p-3' : 'p-4'}`}>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-600">
-            <span className="flex items-center gap-1.5 font-medium text-stone-800">
+        <li key={`${e.unit_id}-${i}`} className={`rounded-lg border border-gray-200 ${compact ? 'p-3' : 'p-4'}`}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+            <span className="flex items-center gap-1.5 font-medium text-gray-800">
               <Swatch report={report} pillar={e.pillar} />
               {t(pillarName(report, e.pillar))}
             </span>
@@ -146,14 +146,14 @@ export function EvidenceList({
               </span>
             )}
           </div>
-          <p className={`mt-2 font-medium text-stone-900 ${compact ? 'text-sm' : ''}`}>{e.summary}</p>
+          <p className={`mt-2 font-medium text-gray-900 ${compact ? 'text-sm' : ''}`}>{e.summary}</p>
           {!compact && (
-            <blockquote className="mt-2 border-l-2 border-stone-200 pl-3 text-sm whitespace-pre-wrap text-stone-600">
+            <blockquote className="mt-2 border-l-2 border-gray-200 pl-3 text-sm whitespace-pre-wrap text-gray-600">
               {e.quote}
             </blockquote>
           )}
-          {!compact && <p className="mt-2 text-xs text-stone-500">{t('Why: {reason}', { reason: e.rationale })}</p>}
-          <button onClick={() => onOpenSource(e)} className="mt-2 text-sm font-medium text-sky-700 hover:underline">
+          {!compact && <p className="mt-2 text-xs text-gray-500">{t('Why: {reason}', { reason: e.rationale })}</p>}
+          <button onClick={() => onOpenSource(e)} className="mt-2 text-sm font-medium text-brand-700 hover:underline">
             {t('Open in #{channel} →', { channel: e.channel })}
           </button>
         </li>

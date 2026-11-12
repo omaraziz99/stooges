@@ -105,9 +105,10 @@ export function Composer({
     inputRef.current?.focus()
   }
 
-  const submit = async (e?: FormEvent) => {
+  /** Sends the message, or runs `command` (a picked suggestion) instead of the typed text. */
+  const submit = async (e?: FormEvent, command?: string) => {
     e?.preventDefault()
-    const trimmed = text.trim()
+    const trimmed = (command ?? text).trim()
     if ((!trimmed && ready.length === 0) || sending || disabled || uploading) return
     setSending(true)
     setError(null)
@@ -143,7 +144,9 @@ export function Composer({
     }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      submit()
+      // With suggestions open, Enter runs the highlighted one, not the half-typed text:
+      // "/kpi-" alone would otherwise run as a bare /kpi.
+      submit(undefined, suggestions.length > 0 ? suggestions[highlighted].value : undefined)
     }
   }
 
@@ -167,7 +170,7 @@ export function Composer({
         <ul
           role="listbox"
           aria-label="Command suggestions"
-          className="absolute right-4 bottom-full left-4 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stone-200 bg-white p-1 shadow-lg"
+          className="absolute right-4 bottom-full left-4 mb-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg"
         >
           {suggestions.map((s, i) => (
             <li key={s.value} role="option" aria-selected={i === highlighted}>
@@ -177,24 +180,24 @@ export function Composer({
                 onClick={() => accept(s)}
                 onMouseEnter={() => setActive(i)}
                 className={`flex w-full items-baseline justify-between gap-3 rounded-md px-2.5 py-1.5 text-left text-sm ${
-                  i === highlighted ? 'bg-stone-100' : ''
+                  i === highlighted ? 'bg-gray-100' : ''
                 }`}
               >
                 <span>
-                  <span className="font-mono text-stone-900">{s.value}</span>
-                  <span className="ml-2 text-stone-500">{s.label}</span>
+                  <span className="font-mono text-gray-900">{s.value}</span>
+                  <span className="ml-2 text-gray-500">{s.label}</span>
                 </span>
-                {s.hint && <span className="shrink-0 text-xs text-stone-400">{s.hint}</span>}
+                {s.hint && <span className="shrink-0 text-xs text-gray-400">{s.hint}</span>}
               </button>
             </li>
           ))}
-          <li className="px-2.5 pt-1 pb-0.5 text-xs text-stone-400">{t('Tab to complete · Enter to run')}</li>
+          <li className="px-2.5 pt-1 pb-0.5 text-xs text-gray-400">{t('Tab to complete · Enter to run')}</li>
         </ul>
       )}
       {error && <p className="mb-1.5 px-1 text-sm text-rose-600">{error}</p>}
       <div
-        className={`rounded-2xl border bg-white px-3 pt-2.5 pb-2 shadow-[0_1px_2px_rgb(0_0_0/0.04)] focus-within:border-stone-300 focus-within:shadow-[0_2px_8px_rgb(0_0_0/0.06)] ${
-          dragging ? 'border-sky-400 ring-2 ring-sky-300' : 'border-stone-200'
+        className={`rounded-2xl border bg-white px-3 pt-2.5 pb-2 shadow-[0_1px_2px_rgb(0_0_0/0.04)] focus-within:border-gray-300 focus-within:shadow-[0_2px_8px_rgb(0_0_0/0.06)] ${
+          dragging ? 'border-brand-400 ring-2 ring-brand-300' : 'border-gray-200'
         }`}
       >
         {pending.length > 0 && (
@@ -203,22 +206,22 @@ export function Composer({
               <li
                 key={p.id}
                 className={`relative flex max-w-56 items-center gap-2 rounded-lg border p-1.5 pr-7 text-xs ${
-                  p.error ? 'border-rose-300 bg-rose-50' : 'border-stone-200 bg-stone-50'
+                  p.error ? 'border-rose-300 bg-rose-50' : 'border-gray-200 bg-gray-50'
                 }`}
               >
                 {p.preview ? (
                   <img src={p.preview} alt="" className="size-9 shrink-0 rounded object-cover" />
                 ) : (
-                  <FileText aria-hidden className="size-9 shrink-0 p-1.5 text-stone-500" />
+                  <FileText aria-hidden className="size-9 shrink-0 p-1.5 text-gray-500" />
                 )}
                 <span className="min-w-0">
-                  <span className="block truncate font-medium text-stone-800">{p.file.name}</span>
-                  <span className={`block truncate ${p.error ? 'text-rose-600' : 'text-stone-500'}`}>
+                  <span className="block truncate font-medium text-gray-800">{p.file.name}</span>
+                  <span className={`block truncate ${p.error ? 'text-rose-600' : 'text-gray-500'}`}>
                     {p.error ?? (p.attachment ? formatSize(p.file.size) : t('Uploading…'))}
                   </span>
                 </span>
                 {!p.attachment && !p.error && (
-                  <LoaderCircle aria-hidden className="absolute top-1.5 right-1.5 size-4 animate-spin text-stone-400" />
+                  <LoaderCircle aria-hidden className="absolute top-1.5 right-1.5 size-4 animate-spin text-gray-400" />
                 )}
                 {(p.attachment || p.error) && (
                   <button
@@ -226,7 +229,7 @@ export function Composer({
                     onClick={() => removePending(p.id)}
                     aria-label={t('Remove attachment')}
                     title={t('Remove attachment')}
-                    className="absolute top-1 right-1 rounded p-0.5 text-stone-500 hover:bg-black/5 hover:text-stone-900"
+                    className="absolute top-1 right-1 rounded p-0.5 text-gray-500 hover:bg-black/5 hover:text-gray-900"
                   >
                     <X aria-hidden className="size-3.5" />
                   </button>
@@ -249,7 +252,7 @@ export function Composer({
           placeholder={placeholder}
           disabled={disabled}
           aria-label={placeholder}
-          className="block max-h-48 min-h-6 w-full resize-none bg-transparent leading-6 outline-none placeholder:text-stone-400 disabled:cursor-not-allowed"
+          className="block max-h-48 min-h-6 w-full resize-none bg-transparent leading-6 outline-none placeholder:text-gray-400 disabled:cursor-not-allowed"
         />
         <div className="mt-1.5 flex items-center justify-between gap-2">
           <input
@@ -269,7 +272,7 @@ export function Composer({
             disabled={disabled || pending.length >= MAX_ATTACHMENTS}
             aria-label={t('Attach file')}
             title={t('Attach file')}
-            className="flex size-8 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-black/5 hover:text-stone-900 disabled:opacity-40"
+            className="flex size-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-900 disabled:opacity-40"
           >
             <Paperclip aria-hidden className="size-4" />
           </button>
@@ -278,7 +281,7 @@ export function Composer({
             disabled={(!text.trim() && ready.length === 0) || sending || disabled || uploading}
             aria-label={sending ? 'Sending' : isCommand ? 'Run' : 'Send'}
             title={isCommand ? t('Run command') : t('Send')}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-on-brand transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
             {isCommand ? <CornerDownLeft aria-hidden className="size-4" /> : <ArrowUp aria-hidden className="size-4" />}
           </button>
