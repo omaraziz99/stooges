@@ -32,6 +32,7 @@ go test ./...
 | `ALLOWED_ORIGINS` | any | Comma-separated web origins allowed to connect, e.g. `https://stooges.vercel.app,http://localhost:5173`; `*` wildcards allowed. Rejected origins are logged |
 | `FILES_DIR` | `files` next to `DB_PATH` | Where chat attachments are stored (`/data/files` in the Docker image, so on the volume) |
 | `SEED_ON_START` | | `true` loads the fictional demo channel on start (Docker image only; idempotent) |
+| `KPI_SAMPLE_ON_START` | | `true` creates a KPI agent key in `/data` and publishes a sample report once per volume (Docker image, local demo only: never on a hosted relay, as the agent's secret key would live on the server) |
 
 Settings can also go in `be/.env` (see `.env.example`).
 

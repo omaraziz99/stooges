@@ -41,13 +41,13 @@ Or with Docker, from the repo root (no Go or Node needed):
 docker compose up --build    # relay + sample data on :7777, web app on http://localhost:5173
 ```
 
-For KPI reports, create the agent key once, recreate the relay so it picks the key up, then run the
-agent inside the relay container:
+The first start also creates a KPI agent key (kept in the volume) and publishes a sample KPI report
+from keyword rules, so `/kpi-maya` works at once. For a real AI report, put `GEMINI_API_KEY` in
+`be/.env`, then:
 
 ```bash
-docker compose run --rm -T relay kpi -keygen >> be/.env
-docker compose up --build -d
-docker compose exec relay kpi -sample   # or `kpi`, with GEMINI_API_KEY in be/.env
+docker compose up -d                  # picks up be/.env
+docker compose exec relay kpi         # or `kpi -sample` to rebuild the sample after new messages
 ```
 
 Data lives in the `relay-data` volume; `docker compose down -v` wipes it.

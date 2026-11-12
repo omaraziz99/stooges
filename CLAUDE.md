@@ -9,8 +9,9 @@ demo logins. Read them before changing behaviour they describe, and update them 
 
 ## Commands
 
-Whole stack from the repo root: `docker compose up --build` (relay with sample data on :7777, web
-app on :5173). The KPI agent runs inside the relay container: `docker compose exec relay kpi -sample`.
+Whole stack from the repo root: `docker compose up --build` (relay with sample data and a sample KPI
+report on :7777, web app on :5173; see `be/docker-entrypoint.sh`). Rerun the KPI agent inside the
+relay container: `docker compose exec relay kpi -sample`.
 
 Backend, from `be/`:
 

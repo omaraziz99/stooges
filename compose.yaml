@@ -7,6 +7,7 @@ services:
       - "7777:7777"
     environment:
       SEED_ON_START: "true" # fictional demo channels and logins; re-seeding adds no duplicates
+      KPI_SAMPLE_ON_START: "true" # local only: agent key on the volume + one sample KPI report
       DB_PATH: /data/stooges.db # keep data on the volume even if be/.env sets DB_PATH
     env_file:
       # Optional: KPI_AGENT_SECRET (and GEMINI_API_KEY) for the KPI agent. See README.
