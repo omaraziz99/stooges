@@ -161,7 +161,12 @@ func TestUnitsFromEvents(t *testing.T) {
 		sign(bob, nostr.KindProfile, t0, `{"name":"Bob"}`),
 	}
 
-	units := unitsFromEvents("proj", chat, profiles)
+	consents := []nostr.Event{
+		sign(alice, nostr.KindAppData, t0, `{"consent":true}`, nostr.Tag{"d", nostr.KPIConsentTag}),
+		sign(bob, nostr.KindAppData, t0, `{"consent":true}`, nostr.Tag{"d", nostr.KPIConsentTag}),
+	}
+
+	units := unitsFromEvents("proj", chat, profiles, consents)
 	if len(units) != 1 || units[0].Kind != "thread" {
 		t.Fatalf("want one thread (deleted message dropped), got %+v", units)
 	}
@@ -184,5 +189,154 @@ func TestSchemaAndPromptCoverEveryPillar(t *testing.T) {
 		if !strings.Contains(string(findingsSchema), string(p.ID)) || !strings.Contains(prompt, string(p.ID)) {
 			t.Errorf("pillar %s missing from schema or prompt", p.ID)
 		}
+	}
+}
+
+// Display names are free text. Someone who takes a colleague's name must not
+// have their messages credited to that colleague, or the other way round.
+func TestSameNameDifferentKeysStaySeparate(t *testing.T) {
+	maya, _ := btcec.NewPrivateKey()
+	impostor, _ := btcec.NewPrivateKey()
+	sign := func(k *btcec.PrivateKey, kind int, at time.Time, content string, tags ...nostr.Tag) nostr.Event {
+		ev := nostr.Event{CreatedAt: at.Unix(), Kind: kind, Content: content, Tags: tags}
+		ev.Sign(k)
+		return ev
+	}
+	h := nostr.Tag{"h", "proj"}
+	chat := []nostr.Event{
+		sign(maya, nostr.KindChatMessage, t0, "Root cause is the retry loop; fix is in review", h),
+		sign(impostor, nostr.KindChatMessage, t0.Add(time.Minute), "me too", h),
+	}
+	profiles := []nostr.Event{
+		sign(maya, nostr.KindProfile, t0, `{"name":"Maya Chen"}`),
+		sign(impostor, nostr.KindProfile, t0, `{"name":"Maya Chen"}`),
+	}
+
+	consents := []nostr.Event{
+		sign(maya, nostr.KindAppData, t0, `{"consent":true}`, nostr.Tag{"d", nostr.KPIConsentTag}),
+		sign(impostor, nostr.KindAppData, t0, `{"consent":true}`, nostr.Tag{"d", nostr.KPIConsentTag}),
+	}
+
+	units := unitsFromEvents("proj", chat, profiles, consents)
+	if len(units) != 1 || len(units[0].Messages) != 2 {
+		t.Fatalf("want one conversation of two messages, got %+v", units)
+	}
+	real, fake := units[0].Messages[0], units[0].Messages[1]
+	if real.Author == fake.Author {
+		t.Fatalf("the two accounts must be shown under different names, both are %q", real.Author)
+	}
+
+	// The model credits the real Maya but also cites the impostor's message.
+	kept, _ := Validate(&units[0], []Finding{{
+		Contributor: real.Author, Pillar: TechnicalLeadership, Summary: "Diagnosed the retry loop",
+		Impact: ImpactMedium, EvidenceRefs: []string{"m1", "m2"},
+	}})
+	if len(kept) != 1 || kept[0].Pubkey != nostr.PubKeyHex(maya) || len(kept[0].MessageIDs) != 1 {
+		t.Fatalf("evidence should cite only the real author's message, got %+v", kept)
+	}
+
+	report := BuildReport(units, kept, "test-model", []string{"proj"}, nil)
+	if len(report.People) != 2 {
+		t.Fatalf("want two separate people, got %d", len(report.People))
+	}
+	for _, p := range report.People {
+		wantEvidence := 0
+		if p.Pubkey == nostr.PubKeyHex(maya) {
+			wantEvidence = 1
+		}
+		if len(p.Evidence) != wantEvidence || p.Messages != 1 {
+			t.Errorf("%s (%s): %d evidence, %d messages", p.Name, p.Pubkey[:6], len(p.Evidence), p.Messages)
+		}
+	}
+}
+
+// Only people who opted in are read. Everyone else keeps their place in the
+// conversation but their name and words never reach the model or the report.
+func TestOnlyOptedInPeopleAreReviewed(t *testing.T) {
+	alice, _ := btcec.NewPrivateKey()
+	bob, _ := btcec.NewPrivateKey()
+	carol, _ := btcec.NewPrivateKey()
+	sign := func(k *btcec.PrivateKey, kind int, at time.Time, content string, tags ...nostr.Tag) nostr.Event {
+		ev := nostr.Event{CreatedAt: at.Unix(), Kind: kind, Content: content, Tags: tags}
+		ev.Sign(k)
+		return ev
+	}
+	h := nostr.Tag{"h", "proj"}
+	consent := nostr.Tag{"d", nostr.KPIConsentTag}
+	root := sign(alice, nostr.KindChatMessage, t0, "Wrote up the rollback steps in the wiki", h)
+	chat := []nostr.Event{
+		root,
+		sign(bob, nostr.KindChatMessage, t0.Add(time.Minute), "my private opinion", h, nostr.Tag{"e", root.ID, "", "root"}),
+		sign(bob, nostr.KindReaction, t0.Add(2*time.Minute), "👍", nostr.Tag{"e", root.ID}, h),
+		// Much later, a conversation among people who are not opted in.
+		sign(bob, nostr.KindChatMessage, t0.Add(5*time.Hour), "anyone for lunch", h),
+		sign(carol, nostr.KindChatMessage, t0.Add(5*time.Hour+time.Minute), "yes", h),
+	}
+	profiles := []nostr.Event{
+		sign(alice, nostr.KindProfile, t0, `{"name":"Alice"}`),
+		sign(bob, nostr.KindProfile, t0, `{"name":"Bob"}`),
+		sign(carol, nostr.KindProfile, t0, `{"name":"Carol"}`),
+	}
+	consents := []nostr.Event{
+		sign(alice, nostr.KindAppData, t0, `{"consent":true}`, consent),
+		sign(carol, nostr.KindAppData, t0, `{"consent":false}`, consent), // opted out
+	}
+
+	units := unitsFromEvents("proj", chat, profiles, consents)
+	if len(units) != 1 {
+		t.Fatalf("the conversation with nobody opted in should be dropped, got %d units", len(units))
+	}
+	transcript := units[0].Transcript()
+	for _, leaked := range []string{"Bob", "my private opinion", "👍"} {
+		if strings.Contains(transcript, leaked) {
+			t.Errorf("transcript must not contain %q:\n%s", leaked, transcript)
+		}
+	}
+	if !strings.Contains(transcript, "rollback steps") {
+		t.Errorf("Alice opted in, so her message should be there:\n%s", transcript)
+	}
+
+	// Even if the model credits the placeholder, nothing is recorded for it.
+	kept, _ := Validate(&units[0], []Finding{
+		{Contributor: "Alice", Pillar: KnowledgeSharing, Summary: "Documented rollback", Impact: ImpactLow, EvidenceRefs: []string{"m1"}},
+		{Contributor: units[0].Messages[1].Author, Pillar: KnowledgeSharing, Summary: "x", Impact: ImpactLow, EvidenceRefs: []string{"m2"}},
+	})
+	if len(kept) != 1 || kept[0].Contributor != "Alice" {
+		t.Fatalf("only Alice's contribution should be kept, got %+v", kept)
+	}
+	report := BuildReport(units, kept, "test-model", []string{"proj"}, nil)
+	if len(report.People) != 1 || report.People[0].Name != "Alice" {
+		t.Fatalf("only opted-in people appear in the report, got %+v", report.People)
+	}
+}
+
+// A personal report must carry nothing about anyone else.
+func TestPersonalReportHoldsOnlyThatPerson(t *testing.T) {
+	units := []Unit{{ID: "1", Kind: "conversation", Channel: "proj", Messages: []Message{
+		{ID: "1", Author: "Alice", AuthorKey: "a", At: t0, Text: "Wrote the runbook"},
+		{ID: "2", Author: "Bob", AuthorKey: "b", At: t0.Add(time.Minute), Text: "Fixed the flaky test"},
+	}}}
+	kept, _ := Validate(&units[0], []Finding{
+		{Contributor: "Alice", Pillar: KnowledgeSharing, Summary: "Wrote the runbook", Impact: ImpactMedium, EvidenceRefs: []string{"m1"}},
+		{Contributor: "Bob", Pillar: OwnershipInitiative, Summary: "Fixed the flaky test", Impact: ImpactLow, EvidenceRefs: []string{"m2"}},
+	})
+	team := BuildReport(units, kept, "test-model", []string{"proj"}, []string{"thread x: failed"})
+	if len(team.People) != 2 {
+		t.Fatalf("want two people in the team report, got %d", len(team.People))
+	}
+
+	mine := team.Personal(team.People[0]) // Alice
+	data, _ := json.Marshal(mine)
+	if strings.Contains(string(data), "Bob") || strings.Contains(string(data), "flaky") {
+		t.Fatalf("Alice's report must not mention Bob or his work: %s", data)
+	}
+	if len(mine.People) != 1 || mine.People[0].Name != "Alice" {
+		t.Fatalf("want only Alice, got %+v", mine.People)
+	}
+	if mine.Team.Counts[KnowledgeSharing] != 1 || mine.Team.Counts[OwnershipInitiative] != 0 {
+		t.Errorf("totals should count only Alice's evidence, got %v", mine.Team.Counts)
+	}
+	if len(team.People) != 2 || team.Team.Counts[OwnershipInitiative] != 1 {
+		t.Error("building a personal report must not change the team report")
 	}
 }

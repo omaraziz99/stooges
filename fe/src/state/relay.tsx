@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getPublicKey } from 'nostr-tools/pure'
 import { RelayClient, type Filter, type NostrEvent, type Status } from '../lib/relay'
-import { buildChannels, buildProfiles, Kind, type Profile } from '../lib/chat'
+import { buildChannels, buildProfiles, CONSENT_TAG, Kind, type Profile } from '../lib/chat'
 import { parseReport, REPORT_KIND, REPORT_TAG, type KpiReport } from '../lib/kpi'
 
 // In production set VITE_RELAY_URL (e.g. wss://your-relay.up.railway.app).
@@ -103,17 +103,39 @@ export function useSubscription(filters: Filter[] | null) {
   return state.key === key ? state : { key, events: [] as NostrEvent[], loaded: false }
 }
 
+const newest = (events: NostrEvent[]) =>
+  events.reduce<NostrEvent | null>((a, e) => (!a || e.created_at > a.created_at ? e : a), null)
+
 /**
- * The latest KPI report, published to the relay by the KPI agent. Updates
- * live when the agent re-runs. `undefined` while loading, `null` if none.
+ * The KPI report this account may see. The relay sends managers the team
+ * report and everyone else only their own, which is marked `personal`.
+ * Updates live when the agent re-runs. `undefined` while loading, `null` if none.
  */
 export function useKpiReport(): KpiReport | null | undefined {
-  const { events, loaded } = useSubscription([{ kinds: [REPORT_KIND], '#d': [REPORT_TAG] }])
+  const { pubkey } = useRelay()
+  const mine = `${REPORT_TAG}:${pubkey}`
+  const { events, loaded } = useSubscription([{ kinds: [REPORT_KIND], '#d': [REPORT_TAG, mine] }])
   return useMemo(() => {
-    const latest = events.reduce<NostrEvent | null>((a, e) => (!a || e.created_at > a.created_at ? e : a), null)
-    if (latest) return parseReport(latest.content)
-    return loaded ? null : undefined
-  }, [events, loaded])
+    const latest = (tag: string) => newest(events.filter((e) => e.tags.some((t) => t[0] === 'd' && t[1] === tag)))
+    const team = latest(REPORT_TAG)
+    const event = team ?? latest(mine)
+    if (!event) return loaded ? null : undefined
+    const report = parseReport(event.content)
+    return report && { ...report, personal: !team }
+  }, [events, loaded, mine])
+}
+
+/** The signed-in person's opt-in to KPI insights, and when they last changed it. */
+export function useMyConsent() {
+  const { pubkey } = useRelay()
+  const { events, loaded } = useSubscription([{ kinds: [Kind.AppData], authors: [pubkey], '#d': [CONSENT_TAG] }])
+  const latest = newest(events)
+  return {
+    loaded,
+    // The relay only stores valid JSON under this tag.
+    consented: latest ? JSON.parse(latest.content)?.consent === true : false,
+    lastChange: latest?.created_at ?? 0,
+  }
 }
 
 export function useChannels() {

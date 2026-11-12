@@ -1,5 +1,5 @@
-import { sendMessage, type Channel, type ChannelState } from '../lib/chat'
-import { useRelay } from '../state/relay'
+import { errorText, sendMessage, setChannelKpiReview, type Channel, type ChannelState } from '../lib/chat'
+import { useNotify, useRelay } from '../state/relay'
 import { Composer, type Suggestion } from './Composer'
 import { MessageList } from './MessageList'
 
@@ -20,7 +20,22 @@ export function ChannelView({
   onCommand: (text: string) => Promise<void>
   suggest: (text: string) => Suggestion[]
 }) {
-  const { client } = useRelay()
+  const { client, pubkey } = useRelay()
+  const notify = useNotify()
+  const isCreator = channel.creator !== '' && channel.creator === pubkey
+
+  const toggleReview = async () => {
+    const next = !channel.kpiReview
+    const question = next
+      ? `Include #${channel.name} in KPI insights?\n\nThe KPI agent will read messages here from people who have opted in. Everyone in the channel will see a badge saying so.`
+      : `Stop including #${channel.name} in KPI insights?`
+    if (!window.confirm(question)) return
+    try {
+      await setChannelKpiReview(client, channel.id, next)
+    } catch (err) {
+      notify(errorText(err))
+    }
+  }
 
   const intro = (
     <div className="px-5 pb-4">
@@ -43,10 +58,29 @@ export function ChannelView({
         >
           ☰
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="truncate font-semibold text-stone-900"># {channel.name}</h1>
           {channel.about && <p className="truncate text-xs text-stone-500">{channel.about}</p>}
         </div>
+        <span
+          title={
+            channel.kpiReview
+              ? 'The KPI agent reads messages here, only from people who have opted in.'
+              : 'The KPI agent never reads this channel.'
+          }
+          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
+            channel.kpiReview
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+              : 'border-stone-200 bg-stone-50 text-stone-500'
+          }`}
+        >
+          {channel.kpiReview ? 'KPI insights on' : 'Not reviewed'}
+        </span>
+        {isCreator && (
+          <button onClick={toggleReview} className="shrink-0 text-xs font-medium text-sky-700 hover:underline">
+            {channel.kpiReview ? 'Turn off' : 'Turn on'}
+          </button>
+        )}
       </header>
 
       <MessageList

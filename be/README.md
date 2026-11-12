@@ -5,7 +5,7 @@ plus two command-line tools. See the [root README](../README.md) for deployment.
 
 ```
 cmd/relay/       the chat server (WebSockets + SQLite)
-cmd/seed/        loads fictional sample data (seed/project-orbit.json)
+cmd/seed/        loads fictional sample data (seed/demo.json)
 cmd/kpi/         the KPI agent
 internal/nostr/  event hashing, Schnorr signatures, filters
 internal/store/  SQLite storage (pure Go, no cgo)
@@ -27,6 +27,7 @@ go test ./...
 | `PORT` / `ADDR` | `7777` | Listen port (Railway sets `PORT`); `ADDR` overrides with a full address |
 | `DB_PATH` | `stooges.db` | SQLite file; use a volume in production (`/data/stooges.db` in the Docker image) |
 | `KPI_AGENT_PUBKEY` | | The only key allowed to publish KPI reports. Locally, `KPI_AGENT_SECRET` in `.env` also works |
+| `MANAGER_PUBKEYS` | nobody | Comma-separated hex public keys allowed to read everyone's KPI report. Everyone else can read only their own. In the app, **Copy public key** in the sidebar gives a user's key |
 | `ALLOWED_ORIGINS` | any | Comma-separated web origins allowed to connect |
 | `SEED_ON_START` | | `true` loads the fictional demo channel on start (Docker image only; idempotent) |
 
@@ -38,7 +39,16 @@ What it supports:
 - **Channels (NIP-29 subset)**: `#general` is created on first start. Kind `9007` creates a channel,
   and the relay answers with a relay-signed kind `39000` metadata event.
 - **Allowed kinds**: `0` profile, `9` message (threads via `["e", root, "", "root"]`), `7` reaction,
-  `5` delete own events, `30078` with `d=kpi-report` from the KPI agent only. Everything else is refused.
+  `5` delete own events, `9002` turn KPI review of a channel on or off (creator only), and `30078`
+  with `d=kpi-report` (KPI agent only) or `d=kpi-consent` (a person's own opt-in). Everything else
+  is refused.
+- **Work channels**: a channel is reviewed by the KPI agent only if its creator marks it, with
+  `["kpi", "on"]` at creation or a kind `9002` later. The relay-signed metadata then carries the
+  same tag, which the app shows as a badge. `#general` belongs to the relay, so it can
+  never be marked.
+- **Reading**: everything is public except KPI reports. The team report (`d=kpi-report`) is sent
+  only to signed-in keys in `MANAGER_PUBKEYS`. Each person's own report
+  (`d=kpi-report:<their pubkey>`) is sent to that person and to managers, nobody else.
 - Every event's ID and signature is verified before it's stored.
 
 ## Seed
@@ -48,16 +58,25 @@ go run ./cmd/seed                                  # into ws://localhost:7777
 go run ./cmd/seed -relay wss://your-relay.example  # into a deployed relay
 ```
 
-Each fictional user signs in and posts their own messages. Re-running adds no duplicates.
+Each fictional user signs in, opts in to KPI insights, and posts their own messages. Three work
+channels are created with KPI review on and two private ones with it off. Re-running adds no
+duplicates. At the end it prints secret keys for a sample employee and manager to sign in with,
+and the `MANAGER_PUBKEYS` value for the relay.
 
 ## KPI agent
 
 ```bash
 go run ./cmd/kpi -keygen          # once: KPI_AGENT_SECRET for .env, KPI_AGENT_PUBKEY for the relay
-go run ./cmd/kpi                  # review #project-orbit with Gemini and publish the report
+go run ./cmd/kpi                  # review every channel marked for KPI insights and publish the report
 go run ./cmd/kpi -dry-run         # preview what would be sent, no API calls
 go run ./cmd/kpi -provider claude # use Claude (ANTHROPIC_API_KEY) instead
 ```
+
+Privacy rules, enforced in code before anything is sent to a model:
+- **Work channels only.** The agent refuses a channel that its creator has not marked for KPI review.
+- **Opt-in.** Only people who have published their own signed opt-in are read. Anyone else's
+  messages are replaced by a placeholder (no name, no text), their reactions are ignored, and
+  they do not appear in the report. Opting out takes effect on the next run.
 
 How it works:
 1. Reads the channel from the relay and groups messages into whole conversations (a thread, or a
@@ -65,14 +84,16 @@ How it works:
 2. Sends conversations to the model in batches of 8 (`-batch`) and asks for contributions in four
    pillars: technical leadership, knowledge sharing, industry intelligence, ownership & initiative.
 3. Validates every finding in code. It must cite messages the contributor actually wrote, and must
-   name a real participant, pillar, and impact level.
+   name a real participant, pillar, and impact level. People are told apart by public key, so an
+   account that copies someone's display name is listed separately, as `Name (abc123)`.
 4. Writes one review per person from that person's evidence only: a headline, summary,
    evidence-linked highlights, and 1-on-1 questions. There is no score, and no weaknesses are
    written.
-5. Publishes the report to the relay, signed with the agent key. The app shows it live, and
-   managers open a person's review with `/kpi-<name>`.
+5. Publishes the team report to the relay, signed with the agent key, plus one report per person
+   that holds only that person's evidence and review. The app shows them live: managers see
+   everyone and open a review with `/kpi-<name>`; everyone else sees only their own.
 
-It is quota-friendly. The sample channel takes about 3 requests plus one per person (about 9 in
+It is quota-friendly. The sample data takes about 5 requests plus one per person (about 12 in
 total). Results are cached in `.kpi-cache.json` (git-ignored), so re-runs only send new or changed
 conversations. If the API quota runs out, the run stops at once, keeps its progress, and the next
 run finishes the rest.

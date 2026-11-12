@@ -77,6 +77,12 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	// Databases created before KPI review existed lack this column.
+	if _, err := db.Exec(`ALTER TABLE groups ADD COLUMN kpi_review INTEGER NOT NULL DEFAULT 0`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		db.Close()
+		return nil, fmt.Errorf("apply schema: %w", err)
+	}
 	return &Store{db: db}, nil
 }
 
@@ -250,11 +256,21 @@ func (s *Store) Query(ctx context.Context, f nostr.Filter) ([]nostr.Event, error
 	return out, rows.Err()
 }
 
+// Group is a channel.
+type Group struct {
+	ID        string
+	Name      string
+	About     string
+	CreatedBy string
+	KPIReview bool // a work channel the KPI agent may read
+
+}
+
 // CreateGroup records a new channel. It returns ErrGroupExists if the ID is taken.
-func (s *Store) CreateGroup(ctx context.Context, id, name, about, createdBy string, createdAt int64) error {
+func (s *Store) CreateGroup(ctx context.Context, g Group, createdAt int64) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT OR IGNORE INTO groups (id, name, about, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
-		id, name, about, createdBy, createdAt)
+		`INSERT OR IGNORE INTO groups (id, name, about, created_by, created_at, kpi_review) VALUES (?, ?, ?, ?, ?, ?)`,
+		g.ID, g.Name, g.About, g.CreatedBy, createdAt, g.KPIReview)
 	if err != nil {
 		return err
 	}
@@ -262,6 +278,23 @@ func (s *Store) CreateGroup(ctx context.Context, id, name, about, createdBy stri
 		return ErrGroupExists
 	}
 	return nil
+}
+
+// GetGroup returns a channel; ok is false if it does not exist.
+func (s *Store) GetGroup(ctx context.Context, id string) (g Group, ok bool, err error) {
+	err = s.db.QueryRowContext(ctx,
+		`SELECT id, name, about, created_by, kpi_review FROM groups WHERE id = ?`, id).
+		Scan(&g.ID, &g.Name, &g.About, &g.CreatedBy, &g.KPIReview)
+	if errors.Is(err, sql.ErrNoRows) {
+		return g, false, nil
+	}
+	return g, err == nil, err
+}
+
+// SetGroupKPIReview turns KPI review of a channel on or off.
+func (s *Store) SetGroupKPIReview(ctx context.Context, id string, on bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE groups SET kpi_review = ? WHERE id = ?`, on, id)
+	return err
 }
 
 // GroupExists reports whether a channel with the given ID exists.

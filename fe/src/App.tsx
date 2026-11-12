@@ -75,7 +75,13 @@ function Workspace({ newName }: { newName: string | null }) {
   const state = useMemo(() => buildChannelState(events, pubkey), [events, pubkey])
 
   // A just-created channel may not be in the list yet; show it by ID meanwhile.
-  const channel = channels.find((c) => c.id === activeId) ?? { id: activeId, name: activeId, about: '' }
+  const channel = channels.find((c) => c.id === activeId) ?? {
+    id: activeId,
+    name: activeId,
+    about: '',
+    creator: '',
+    kpiReview: false,
+  }
 
   const report = useKpiReport()
   const [reviewName, setReviewName] = useState<string | null>(null) // open /kpi-<name> panel
@@ -108,7 +114,7 @@ function Workspace({ newName }: { newName: string | null }) {
     const cmd = parseKpiCommand(text)
     if (!cmd) throw new Error(`Unknown command ${text.split(/\s/)[0]}. Try /kpi-<name>.`)
     if (report === undefined) throw new Error('The KPI report is still loading. Try again in a moment.')
-    if (!report) throw new Error('No KPI report yet. Run `go run ./cmd/kpi` in be/ first.')
+    if (!report) throw new Error('No KPI report for you yet. Opt in from the sidebar; it appears after the agent next runs.')
     if (!cmd.query) {
       setKpiSelected(null)
       setView('kpi')
@@ -116,6 +122,7 @@ function Workspace({ newName }: { newName: string | null }) {
     }
     const matches = findPeople(report.people, cmd.query)
     if (matches.length === 0) {
+      if (report.personal) throw new Error('You can only open your own KPI review.')
       throw new Error(`No one called "${cmd.query}" in the report. Try ${report.people.map((p) => commandFor(p.name)).join(', ')}.`)
     }
     if (matches.length > 1) {

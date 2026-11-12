@@ -1,0 +1,752 @@
+{
+  "_note": "Fictional demo data. The team, projects, people, and conversations are made up.",
+  "users": [
+    "Maya Chen",
+    "Leo Tan",
+    "Sara Lim",
+    "Ravi Kumar",
+    "Nora Ahmad",
+    "Ben Ortiz",
+    "Priya Nair"
+  ],
+  "demo_accounts": {
+    "employee": "Maya Chen",
+    "manager": "Priya Nair"
+  },
+  "channels": [
+    {
+      "id": "project-orbit",
+      "name": "project-orbit",
+      "about": "Orbit booking app: web, mobile, and API",
+      "kpi_review": true,
+      "messages": [
+        {
+          "author": "Nora Ahmad",
+          "at": "2026-09-01T09:05:00+08:00",
+          "text": "Morning all! Sprint 14 starts today. Board is updated, please pick up your tickets by lunch 🙏"
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-09-01T09:07:12+08:00",
+          "text": "on it"
+        },
+        {
+          "author": "Nora Ahmad",
+          "at": "2026-09-01T10:30:00+08:00",
+          "text": "Release plan for Orbit 2.0 @channel\n• Code freeze: 10 Oct\n• Staging sign-off: 17 Oct\n• Public launch: 24 Oct\nEach area needs an owner who confirms readiness at the go/no-go on 22 Oct. Reply here to claim one: payments, search, notifications, mobile.",
+          "reactions": [
+            {
+              "emoji": "👍",
+              "by": [
+                "Maya Chen",
+                "Leo Tan",
+                "Sara Lim"
+              ]
+            },
+            {
+              "emoji": "🚀",
+              "by": [
+                "Ravi Kumar"
+              ]
+            }
+          ],
+          "replies": [
+            {
+              "author": "Leo Tan",
+              "at": "2026-09-01T10:41:00+08:00",
+              "text": "I'll own payments. Will also write the rollback steps for the new provider."
+            },
+            {
+              "author": "Sara Lim",
+              "at": "2026-09-01T10:44:00+08:00",
+              "text": "Mobile is mine."
+            },
+            {
+              "author": "Ravi Kumar",
+              "at": "2026-09-01T10:52:00+08:00",
+              "text": "I can take notifications. The retry queue still drops messages under load, so I'll fix that before freeze and add an alert for it."
+            },
+            {
+              "author": "Maya Chen",
+              "at": "2026-09-01T11:05:00+08:00",
+              "text": "I'll take search. Also flagging a risk: the new ranking needs a reindex that takes ~3h on prod data. We should schedule it the weekend before launch, not launch day."
+            },
+            {
+              "author": "Nora Ahmad",
+              "at": "2026-09-01T11:12:00+08:00",
+              "text": "Great catch Maya, adding the reindex window to the plan for 18 Oct."
+            }
+          ]
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-09-03T14:20:00+08:00",
+          "text": "https://react.dev/blog"
+        },
+        {
+          "author": "Leo Tan",
+          "at": "2026-09-05T16:10:00+08:00",
+          "text": "Worth a read: https://www.postgresql.org/about/news/\nThe new async I/O in Postgres 18 could cut our booking-history report from ~4s to well under 1s, since it's mostly sequential scans. I'd like to benchmark it on staging next sprint before we decide anything.",
+          "reactions": [
+            {
+              "emoji": "👀",
+              "by": [
+                "Maya Chen",
+                "Ravi Kumar"
+              ]
+            },
+            {
+              "emoji": "💯",
+              "by": [
+                "Nora Ahmad"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-09-09T11:02:00+08:00",
+          "text": "Quick question: why does the booking form submit twice on slow networks? I added a loading state but it still happens sometimes 😅",
+          "replies": [
+            {
+              "author": "Maya Chen",
+              "at": "2026-09-09T11:15:00+08:00",
+              "text": "Good question. The loading state only disables the button after React re-renders, so a fast double tap gets two submits in before that. Two fixes:\n1. Guard in the handler with a ref (isSubmitting.current) so the second call returns immediately.\n2. Send an idempotency key with the request, so the API ignores a duplicate even if one slips through.\nWe already support idempotency keys in /bookings, you just need to pass the header."
+            },
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-09T11:40:00+08:00",
+              "text": "That worked, thank you! Added both."
+            },
+            {
+              "author": "Maya Chen",
+              "at": "2026-09-09T11:46:00+08:00",
+              "text": "Nice. Can you add a test that fires two submits in a row? That way it can't come back quietly."
+            },
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-09T13:20:00+08:00",
+              "text": "Test added in the PR 👍"
+            }
+          ]
+        },
+        {
+          "author": "Sara Lim",
+          "at": "2026-09-12T12:30:00+08:00",
+          "text": "Pizza Friday is back 🍕 who's in?",
+          "reactions": [
+            {
+              "emoji": "🍕",
+              "by": [
+                "Ben Ortiz",
+                "Leo Tan",
+                "Ravi Kumar"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Sara Lim",
+          "at": "2026-09-15T09:30:00+08:00",
+          "text": "Lunch & learn this Thursday 12:30: \"Design tokens in practice\". I'll walk through how we moved the mobile and web themes onto one token file, the mistakes we made, and a checklist for adding new components without breaking dark mode. Slides and recording go in the team drive after.",
+          "reactions": [
+            {
+              "emoji": "🙌",
+              "by": [
+                "Nora Ahmad",
+                "Ben Ortiz"
+              ]
+            },
+            {
+              "emoji": "👍",
+              "by": [
+                "Maya Chen"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Sara Lim",
+          "at": "2026-09-18T14:05:00+08:00",
+          "text": "Thanks for coming everyone! Recording and the component checklist are in the drive under Design / Tokens. The checklist is also pinned in this channel."
+        },
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-09-22T08:50:00+08:00",
+          "text": "CI has been flaky all week (about 1 in 5 runs fail on the e2e step). I'm going to take this on. I'll quarantine the flaky tests today and post what I find."
+        },
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-09-24T17:20:00+08:00",
+          "text": "CI update: root cause was two e2e tests sharing the same seeded user, so they raced each other. Each test now creates its own user. 50 runs in a row green ✅ I wrote up how to spot this pattern in docs/testing.md.",
+          "reactions": [
+            {
+              "emoji": "🎉",
+              "by": [
+                "Maya Chen",
+                "Leo Tan",
+                "Sara Lim",
+                "Nora Ahmad"
+              ]
+            },
+            {
+              "emoji": "🙏",
+              "by": [
+                "Ben Ortiz"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Leo Tan",
+          "at": "2026-09-26T16:00:00+08:00",
+          "text": "Anyone up for coffee? ☕"
+        },
+        {
+          "author": "Maya Chen",
+          "at": "2026-10-03T21:14:00+08:00",
+          "text": "Heads up: checkout p95 latency jumped from 300ms to 2.4s after this afternoon's deploy. Looking into it now.",
+          "replies": [
+            {
+              "author": "Maya Chen",
+              "at": "2026-10-03T21:31:00+08:00",
+              "text": "Found it. The new promo banner loads each user's coupons one booking at a time, so checkout does 40+ queries instead of 1 (N+1). Rolling the banner back behind its feature flag now."
+            },
+            {
+              "author": "Leo Tan",
+              "at": "2026-10-03T21:35:00+08:00",
+              "text": "I'm around, want me to write the batched query?"
+            },
+            {
+              "author": "Maya Chen",
+              "at": "2026-10-03T21:37:00+08:00",
+              "text": "Yes please. Flag is off and p95 is back to 310ms. Let's ship the batched version tomorrow with a query-count test so this gets caught in CI next time."
+            },
+            {
+              "author": "Leo Tan",
+              "at": "2026-10-04T10:20:00+08:00",
+              "text": "Batched query is up for review. Checkout now runs 2 queries regardless of basket size, and the new test fails if it goes above 3."
+            },
+            {
+              "author": "Maya Chen",
+              "at": "2026-10-04T11:02:00+08:00",
+              "text": "Reviewed and merged. I'll write a short incident note for the team so everyone knows what to look for."
+            }
+          ]
+        },
+        {
+          "author": "Maya Chen",
+          "at": "2026-10-04T15:30:00+08:00",
+          "text": "Incident note: checkout slowdown, 3 Oct.\nWhat happened: an N+1 query in the promo banner took p95 from 300ms to 2.4s for ~25 minutes.\nWhat we changed: batched query (thanks Leo) plus a CI test that fails when checkout runs more than 3 queries.\nTip for reviews: any loop that calls the API or the DB inside a render path is worth a second look.",
+          "reactions": [
+            {
+              "emoji": "📌",
+              "by": [
+                "Nora Ahmad",
+                "Sara Lim"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-10-07T10:15:00+08:00",
+          "text": "is the staging DB down or is it just me"
+        },
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-10-07T10:18:00+08:00",
+          "text": "It was me, restarting it for the upgrade. Back in 2 min, sorry!"
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-10-14T16:45:00+08:00",
+          "text": "Found this while fixing the date picker: https://developer.mozilla.org/en-US/docs/Web/API/Temporal\nTemporal handles time zones properly, which is exactly what keeps breaking our booking times for users abroad. Polyfill is small. Could we try it in the date picker first?",
+          "reactions": [
+            {
+              "emoji": "👍",
+              "by": [
+                "Sara Lim",
+                "Maya Chen"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Leo Tan",
+          "at": "2026-10-16T11:00:00+08:00",
+          "text": "Proposal for the payments retry logic before launch:\nOption A: retry in the API request (simple, but the user waits up to 10s).\nOption B: queue the retry and email the receipt when it succeeds (more moving parts, but checkout stays fast).\nI lean towards B, since it matches how notifications already work and Ravi's queue fix makes it reliable. Thoughts by Friday?",
+          "replies": [
+            {
+              "author": "Ravi Kumar",
+              "at": "2026-10-16T11:20:00+08:00",
+              "text": "B works for me, the queue can take it now."
+            },
+            {
+              "author": "Nora Ahmad",
+              "at": "2026-10-16T11:35:00+08:00",
+              "text": "B from the product side too, as long as the receipt email says the payment is processing."
+            },
+            {
+              "author": "Leo Tan",
+              "at": "2026-10-17T09:40:00+08:00",
+              "text": "Going with B. Implemented, with the processing message Nora asked for, and added it to the rollback doc."
+            }
+          ]
+        },
+        {
+          "author": "Nora Ahmad",
+          "at": "2026-10-22T15:00:00+08:00",
+          "text": "Go/no-go: all four owners confirmed ready ✅ We launch Friday. Thank you all, this was a big one.",
+          "reactions": [
+            {
+              "emoji": "🚀",
+              "by": [
+                "Maya Chen",
+                "Leo Tan",
+                "Sara Lim",
+                "Ravi Kumar",
+                "Ben Ortiz"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Sara Lim",
+          "at": "2026-10-24T18:30:00+08:00",
+          "text": "We're live!! 🎉🎉"
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-10-30T10:00:00+08:00",
+          "text": "https://go.dev/blog"
+        },
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-11-03T09:15:00+08:00",
+          "text": "Post-launch: I'm running a 30-minute session Thursday on our new on-call dashboard: which graphs to check first, what each alert means, and how to silence one properly. Useful for anyone joining the rota next month.",
+          "reactions": [
+            {
+              "emoji": "🙌",
+              "by": [
+                "Ben Ortiz",
+                "Nora Ahmad"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Maya Chen",
+          "at": "2026-11-05T13:10:00+08:00",
+          "text": "Who has the meeting room booking for tomorrow's retro?"
+        },
+        {
+          "author": "Nora Ahmad",
+          "at": "2026-11-05T13:12:00+08:00",
+          "text": "Booked, room 4 at 2pm."
+        }
+      ]
+    },
+    {
+      "id": "platform-infra",
+      "name": "platform-infra",
+      "about": "Infrastructure, CI/CD, and on-call",
+      "kpi_review": true,
+      "messages": [
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-09-02T10:00:00+08:00",
+          "text": "Heads up: I'm moving the CI runners to the new autoscaling pool on Thursday. Expect about 10 minutes where queued jobs wait. I'll post here when it's done.",
+          "reactions": [
+            {
+              "emoji": "👍",
+              "by": [
+                "Leo Tan",
+                "Maya Chen"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-09-04T15:40:00+08:00",
+          "text": "Runner migration done. Median queue time went from 4 minutes to under 1. If a job picks up the old image, re-run it and tell me."
+        },
+        {
+          "author": "Leo Tan",
+          "at": "2026-09-10T11:20:00+08:00",
+          "text": "Proposal: add a read replica for reporting queries before the 2.0 launch.\nWhy: the nightly export competes with checkout traffic on the primary.\nCost: one more database instance.\nRisk: replication lag on dashboards (seconds, acceptable).\nObjections?",
+          "reactions": [
+            {
+              "emoji": "👍",
+              "by": [
+                "Ravi Kumar",
+                "Nora Ahmad"
+              ]
+            }
+          ],
+          "replies": [
+            {
+              "author": "Maya Chen",
+              "at": "2026-09-10T11:34:00+08:00",
+              "text": "No objection. One ask: point the export job at the replica behind a feature flag, so we can flip back fast if lag gets bad."
+            },
+            {
+              "author": "Ravi Kumar",
+              "at": "2026-09-10T11:41:00+08:00",
+              "text": "I can provision it Monday. Leo, can you own the connection-string change?"
+            },
+            {
+              "author": "Leo Tan",
+              "at": "2026-09-10T11:43:00+08:00",
+              "text": "Yes, mine. PR by Wednesday, with Maya's flag."
+            },
+            {
+              "author": "Priya Nair",
+              "at": "2026-09-10T13:05:00+08:00",
+              "text": "Approved. Thanks for costing it up front, Leo."
+            }
+          ]
+        },
+        {
+          "author": "Maya Chen",
+          "at": "2026-09-17T09:10:00+08:00",
+          "text": "Wrote a runbook for \"database connections exhausted\" after last week's page: symptoms, the three queries to run, and when to fail over. It's in the wiki under On-call > Runbooks. Please add anything I missed.",
+          "reactions": [
+            {
+              "emoji": "🙌",
+              "by": [
+                "Ravi Kumar",
+                "Leo Tan",
+                "Nora Ahmad"
+              ]
+            }
+          ],
+          "replies": [
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-18T10:02:00+08:00",
+              "text": "Used it this morning on staging, step 2 saved me. There was one typo in the failover command; I fixed it."
+            }
+          ]
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-09-29T14:00:00+08:00",
+          "text": "Is it normal that deploys to staging take 12 minutes now?",
+          "replies": [
+            {
+              "author": "Ravi Kumar",
+              "at": "2026-09-29T14:06:00+08:00",
+              "text": "Not normal. The image cache was evicted when we resized the pool. I'm pinning the cache volume now; it should be back to about 4 minutes within the hour."
+            },
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-29T15:10:00+08:00",
+              "text": "back to 4 min, thanks"
+            }
+          ]
+        },
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-10-08T10:30:00+08:00",
+          "text": "Sharing because this bit a team I used to work with: https://sre.google/sre-book/monitoring-distributed-systems/\nThe \"four golden signals\" section is a good checklist for the alerts we still need on checkout before launch. We cover latency and errors, but have nothing on saturation.",
+          "reactions": [
+            {
+              "emoji": "👀",
+              "by": [
+                "Maya Chen",
+                "Leo Tan"
+              ]
+            }
+          ],
+          "replies": [
+            {
+              "author": "Maya Chen",
+              "at": "2026-10-08T10:52:00+08:00",
+              "text": "Agree on saturation. I'll add a connection-pool usage alert this week."
+            }
+          ]
+        },
+        {
+          "author": "Priya Nair",
+          "at": "2026-10-13T16:20:00+08:00",
+          "text": "On-call for launch week: I need two volunteers for the secondary rota, 24 to 31 Oct.",
+          "replies": [
+            {
+              "author": "Maya Chen",
+              "at": "2026-10-13T16:24:00+08:00",
+              "text": "I'll take 24 to 27."
+            },
+            {
+              "author": "Leo Tan",
+              "at": "2026-10-13T16:31:00+08:00",
+              "text": "28 to 31 for me."
+            },
+            {
+              "author": "Priya Nair",
+              "at": "2026-10-13T16:40:00+08:00",
+              "text": "Thank you both. The rota is in the calendar."
+            }
+          ]
+        },
+        {
+          "author": "Leo Tan",
+          "at": "2026-10-21T09:45:00+08:00",
+          "text": "Load test results for launch: 3x expected peak held at p95 280ms. Two findings: the session cache needs a bigger instance, and the payment webhook queue backs up past 2x. I've raised both as tickets and I'm fixing the queue one myself today.",
+          "reactions": [
+            {
+              "emoji": "🎉",
+              "by": [
+                "Nora Ahmad",
+                "Priya Nair"
+              ]
+            },
+            {
+              "emoji": "👍",
+              "by": [
+                "Ravi Kumar"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-11-04T11:00:00+08:00",
+          "text": "Anyone else seeing slow VPN this morning?",
+          "replies": [
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-11-04T11:03:00+08:00",
+              "text": "yep, same"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "design-system",
+      "name": "design-system",
+      "about": "Shared components, design tokens, and accessibility",
+      "kpi_review": true,
+      "messages": [
+        {
+          "author": "Sara Lim",
+          "at": "2026-09-08T10:00:00+08:00",
+          "text": "Kicking off the design tokens migration. Plan: colours this sprint, spacing next, typography last. I've listed every component and its owner in the tracker so nobody is surprised. Shout if your component is missing.",
+          "reactions": [
+            {
+              "emoji": "👍",
+              "by": [
+                "Ben Ortiz",
+                "Nora Ahmad"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-09-11T14:15:00+08:00",
+          "text": "Question: should buttons use `color.action.primary` or `color.brand.500`? I see both in the codebase.",
+          "replies": [
+            {
+              "author": "Sara Lim",
+              "at": "2026-09-11T14:22:00+08:00",
+              "text": "Always the semantic one, `color.action.primary`. The raw palette is only for defining tokens. I'll add a lint rule so this doesn't depend on people remembering."
+            },
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-11T14:30:00+08:00",
+              "text": "makes sense, switching mine over"
+            }
+          ]
+        },
+        {
+          "author": "Sara Lim",
+          "at": "2026-09-19T11:30:00+08:00",
+          "text": "The lint rule for raw palette colours is merged. It warns for two weeks, then fails the build from 3 Oct. A migration guide with before/after examples is pinned in this channel.",
+          "reactions": [
+            {
+              "emoji": "🙌",
+              "by": [
+                "Ben Ortiz"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Nora Ahmad",
+          "at": "2026-09-25T15:00:00+08:00",
+          "text": "The accessibility audit came back: 14 issues, 9 of them colour contrast on secondary buttons and disabled states. I've grouped them by component and assigned owners. Target: all fixed before code freeze on 10 Oct.",
+          "replies": [
+            {
+              "author": "Sara Lim",
+              "at": "2026-09-25T15:12:00+08:00",
+              "text": "The contrast ones are mine. Tokens fix most of them in one place."
+            },
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-25T15:20:00+08:00",
+              "text": "I'll take the focus-ring issues on the date picker."
+            }
+          ]
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-10-02T10:10:00+08:00",
+          "text": "Wrote up how I fixed the date picker focus trap, because the modal and the dropdown have the same bug. The pattern to follow is https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/ and the short version is in the PR description.",
+          "reactions": [
+            {
+              "emoji": "👍",
+              "by": [
+                "Sara Lim",
+                "Nora Ahmad"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Nora Ahmad",
+          "at": "2026-10-09T16:30:00+08:00",
+          "text": "All 14 audit issues are closed, a day before freeze. Thanks Sara and Ben."
+        },
+        {
+          "author": "Sara Lim",
+          "at": "2026-10-20T13:00:00+08:00",
+          "text": "does anyone have the link for the new empty-state designs?",
+          "replies": [
+            {
+              "author": "Maya Chen",
+              "at": "2026-10-20T13:04:00+08:00",
+              "text": "It's in the design handoff doc, section 4."
+            }
+          ]
+        },
+        {
+          "author": "Priya Nair",
+          "at": "2026-11-02T10:00:00+08:00",
+          "text": "The design tokens work took our \"fix the colour\" tickets to zero this sprint. Sara, could you run a short session for the mobile team on how you rolled it out?",
+          "replies": [
+            {
+              "author": "Sara Lim",
+              "at": "2026-11-02T10:15:00+08:00",
+              "text": "Happy to. I'll set it up for next Tuesday."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lunch-club",
+      "name": "lunch-club",
+      "about": "Private: food plans and Pizza Friday",
+      "kpi_review": false,
+      "messages": [
+        {
+          "author": "Sara Lim",
+          "at": "2026-09-05T11:45:00+08:00",
+          "text": "Nasi lemak run at 12:15, who wants one?",
+          "replies": [
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-05T11:47:00+08:00",
+              "text": "me please, extra sambal"
+            },
+            {
+              "author": "Leo Tan",
+              "at": "2026-09-05T11:49:00+08:00",
+              "text": "one for me"
+            }
+          ]
+        },
+        {
+          "author": "Leo Tan",
+          "at": "2026-09-19T12:00:00+08:00",
+          "text": "New ramen place opened downstairs. Verdict: broth good, queue terrible."
+        },
+        {
+          "author": "Ben Ortiz",
+          "at": "2026-10-02T11:50:00+08:00",
+          "text": "is pizza friday this week or next"
+        },
+        {
+          "author": "Sara Lim",
+          "at": "2026-10-02T11:52:00+08:00",
+          "text": "this week 🍕"
+        },
+        {
+          "author": "Nora Ahmad",
+          "at": "2026-10-24T19:00:00+08:00",
+          "text": "Launch dinner is booked for 7:30 tonight, table under my name."
+        },
+        {
+          "author": "Maya Chen",
+          "at": "2026-11-06T12:10:00+08:00",
+          "text": "I'm off spicy food for a while, doctor's orders 😅",
+          "replies": [
+            {
+              "author": "Sara Lim",
+              "at": "2026-11-06T12:14:00+08:00",
+              "text": "Noted, I'll order you the mild one."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weekend-hikers",
+      "name": "weekend-hikers",
+      "about": "Private: hikes and weekend plans",
+      "kpi_review": false,
+      "messages": [
+        {
+          "author": "Ravi Kumar",
+          "at": "2026-09-11T18:00:00+08:00",
+          "text": "Bukit Tabur this Sunday, 6:30am start. Two spots left in my car.",
+          "replies": [
+            {
+              "author": "Maya Chen",
+              "at": "2026-09-11T18:05:00+08:00",
+              "text": "In!"
+            },
+            {
+              "author": "Ben Ortiz",
+              "at": "2026-09-11T18:20:00+08:00",
+              "text": "too early for me 😴"
+            }
+          ]
+        },
+        {
+          "author": "Maya Chen",
+          "at": "2026-09-13T13:00:00+08:00",
+          "text": "That view was worth the alarm.",
+          "reactions": [
+            {
+              "emoji": "❤️",
+              "by": [
+                "Ravi Kumar"
+              ]
+            }
+          ]
+        },
+        {
+          "author": "Leo Tan",
+          "at": "2026-10-10T17:30:00+08:00",
+          "text": "Anyone tried the trail at FRIM? Thinking of taking my parents.",
+          "replies": [
+            {
+              "author": "Ravi Kumar",
+              "at": "2026-10-10T17:42:00+08:00",
+              "text": "Easy trail, fine for parents. Go before 9, it gets hot."
+            }
+          ]
+        },
+        {
+          "author": "Priya Nair",
+          "at": "2026-11-01T20:00:00+08:00",
+          "text": "My kid's football final is on Saturday so I'm out for the hike. Have fun!"
+        }
+      ]
+    }
+  ]
+}

@@ -67,10 +67,14 @@ const (
 
 // Message is one chat message.
 type Message struct {
-	ID     string
-	Author string
-	At     time.Time
-	Text   string
+	ID        string
+	Author    string // display name, unique to one key within a unit
+	AuthorKey string // public key; names are free text, so people are told apart by this
+	// Excluded marks a placeholder for someone who has not opted in: it holds
+	// neither their name nor their text, and is never credited or counted.
+	Excluded bool
+	At       time.Time
+	Text     string
 	// Reactions maps an emoji to the names of people who reacted with it.
 	Reactions map[string][]string
 }
@@ -186,6 +190,7 @@ type Evaluator interface {
 // Evidence is a validated contribution, linked to its source messages.
 type Evidence struct {
 	Contributor  string    `json:"contributor"`
+	Pubkey       string    `json:"pubkey,omitempty"`
 	Pillar       Pillar    `json:"pillar"`
 	Summary      string    `json:"summary"`
 	Impact       Impact    `json:"impact"`
@@ -204,8 +209,10 @@ type Evidence struct {
 // returns the kept evidence and a reason for each dropped finding.
 func Validate(u *Unit, findings []Finding) ([]Evidence, []string) {
 	participants := map[string]bool{}
-	for _, p := range u.Participants() {
-		participants[p] = true
+	for _, m := range u.Messages {
+		if !m.Excluded {
+			participants[m.Author] = true
+		}
 	}
 	byRef := map[string]Message{}
 	for i, m := range u.Messages {
@@ -235,7 +242,7 @@ func Validate(u *Unit, findings []Finding) ([]Evidence, []string) {
 		seen := map[string]bool{}
 		for _, ref := range f.EvidenceRefs {
 			m, ok := byRef[ref]
-			if ok && m.Author == f.Contributor && !seen[m.ID] {
+			if ok && !m.Excluded && m.Author == f.Contributor && !seen[m.ID] {
 				seen[m.ID] = true
 				cited = append(cited, m)
 			}
@@ -247,6 +254,7 @@ func Validate(u *Unit, findings []Finding) ([]Evidence, []string) {
 
 		ev := Evidence{
 			Contributor: f.Contributor,
+			Pubkey:      cited[0].AuthorKey,
 			Pillar:      f.Pillar,
 			Summary:     strings.TrimSpace(f.Summary),
 			Impact:      f.Impact,

@@ -8,6 +8,7 @@ export type Pillar = { id: PillarId; name: string; description: string }
 
 export type Evidence = {
   contributor: string
+  pubkey?: string
   pillar: PillarId
   summary: string
   impact: Impact
@@ -37,6 +38,7 @@ export type Review = {
 
 export type Person = {
   name: string
+  pubkey?: string
   messages: number
   counts: Record<PillarId, number>
   impact: Record<Impact, number>
@@ -55,6 +57,8 @@ export type KpiReport = {
   pillars: Pillar[]
   team: { counts: Record<PillarId, number>; by_month: { month: string; counts: Record<PillarId, number> }[] }
   people: Person[]
+  /** Set by the app: this is the viewer's own report, not the team's. */
+  personal?: boolean
 }
 
 // Categorical slots 1-4, validated for colour-blind separation on the light

@@ -1,6 +1,7 @@
 package kpi
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -39,6 +40,7 @@ type MonthCounts struct {
 // score: evidence is for discussion, not ranking.
 type Person struct {
 	Name     string         `json:"name"`
+	Pubkey   string         `json:"pubkey,omitempty"`
 	Messages int            `json:"messages"`
 	Counts   map[Pillar]int `json:"counts"`
 	Impact   map[Impact]int `json:"impact"`
@@ -199,23 +201,28 @@ func BuildReport(units []Unit, evidence []Evidence, model string, channels []str
 		Conversations: len(units),
 		Skipped:       skipped,
 		Pillars:       Pillars,
-		Team:          TeamSummary{Counts: zeroCounts()},
 	}
 
+	// People are told apart by public key, so two accounts that share a
+	// display name are never merged.
 	people := map[string]*Person{}
-	person := func(name string) *Person {
-		p, ok := people[name]
+	person := func(name, pubkey string) *Person {
+		id := cmp.Or(pubkey, name)
+		p, ok := people[id]
 		if !ok {
-			p = &Person{Name: name, Counts: zeroCounts(), Impact: map[Impact]int{ImpactLow: 0, ImpactMedium: 0, ImpactHigh: 0}}
-			people[name] = p
+			p = &Person{Name: name, Pubkey: pubkey, Counts: zeroCounts(), Impact: map[Impact]int{ImpactLow: 0, ImpactMedium: 0, ImpactHigh: 0}}
+			people[id] = p
 		}
 		return p
 	}
 
-	// Everyone who wrote a message appears, even with no evidence yet.
+	// Everyone opted in who wrote a message appears, even with no evidence yet.
 	for _, u := range units {
 		for _, m := range u.Messages {
-			person(m.Author).Messages++
+			if m.Excluded {
+				continue
+			}
+			person(m.Author, m.AuthorKey).Messages++
 			if r.From.IsZero() || m.At.Before(r.From) {
 				r.From = m.At
 			}
@@ -225,24 +232,13 @@ func BuildReport(units []Unit, evidence []Evidence, model string, channels []str
 		}
 	}
 
-	months := map[string]map[Pillar]int{}
 	for _, e := range evidence {
-		p := person(e.Contributor)
+		p := person(e.Contributor, e.Pubkey)
 		p.Counts[e.Pillar]++
 		p.Impact[e.Impact]++
 		p.Evidence = append(p.Evidence, e)
-		r.Team.Counts[e.Pillar]++
-		month := e.At.Format("2006-01")
-		if months[month] == nil {
-			months[month] = zeroCounts()
-		}
-		months[month][e.Pillar]++
 	}
-
-	for month, counts := range months {
-		r.Team.ByMonth = append(r.Team.ByMonth, MonthCounts{Month: month, Counts: counts})
-	}
-	sort.Slice(r.Team.ByMonth, func(i, j int) bool { return r.Team.ByMonth[i].Month < r.Team.ByMonth[j].Month })
+	r.Team = summarize(evidence)
 
 	for _, p := range people {
 		sort.Slice(p.Evidence, func(i, j int) bool { return p.Evidence[i].At.Before(p.Evidence[j].At) })
@@ -252,8 +248,38 @@ func BuildReport(units []Unit, evidence []Evidence, model string, channels []str
 		r.People = append(r.People, *p)
 	}
 	// Alphabetical, not by volume: the report is not a leaderboard.
-	sort.Slice(r.People, func(i, j int) bool { return r.People[i].Name < r.People[j].Name })
+	sort.Slice(r.People, func(i, j int) bool {
+		return r.People[i].Name+r.People[i].Pubkey < r.People[j].Name+r.People[j].Pubkey
+	})
 	return r
+}
+
+// Personal returns the report one person may see about themselves: the same
+// shape as the team report, holding nothing about anyone else.
+func (r Report) Personal(p Person) Report {
+	r.People = []Person{p}
+	r.Skipped = nil
+	r.Team = summarize(p.Evidence)
+	return r
+}
+
+// summarize counts evidence per pillar, overall and per month.
+func summarize(evidence []Evidence) TeamSummary {
+	team := TeamSummary{Counts: zeroCounts()}
+	months := map[string]map[Pillar]int{}
+	for _, e := range evidence {
+		team.Counts[e.Pillar]++
+		month := e.At.Format("2006-01")
+		if months[month] == nil {
+			months[month] = zeroCounts()
+		}
+		months[month][e.Pillar]++
+	}
+	for month, counts := range months {
+		team.ByMonth = append(team.ByMonth, MonthCounts{Month: month, Counts: counts})
+	}
+	sort.Slice(team.ByMonth, func(i, j int) bool { return team.ByMonth[i].Month < team.ByMonth[j].Month })
+	return team
 }
 
 func zeroCounts() map[Pillar]int {

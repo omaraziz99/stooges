@@ -16,7 +16,9 @@ export function KpiDashboard({
   onOpenSource: (e: Evidence) => void
   onOpenSidebar: () => void
 }) {
-  const person = report?.people.find((p) => p.name === selected) ?? null
+  // Someone's own report holds only them, so open it straight away.
+  const person =
+    (report?.personal ? report.people[0] : report?.people.find((p) => p.name === selected)) ?? null
 
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-white">
@@ -29,7 +31,9 @@ export function KpiDashboard({
           ☰
         </button>
         <div className="min-w-0">
-          <h1 className="truncate font-semibold text-stone-900">KPI insights</h1>
+          <h1 className="truncate font-semibold text-stone-900">
+            {report?.personal ? 'Your KPI insights' : 'KPI insights'}
+          </h1>
           {report && (
             <p className="truncate text-xs text-stone-500">
               {report.channels.map((c) => `#${c}`).join(', ')} · {dateFmt(report.from)} to {dateFmt(report.to)}
@@ -39,6 +43,11 @@ export function KpiDashboard({
       </header>
 
       <div className="flex-1 overflow-y-auto">
+        {report?.personal && (
+          <p className="border-b border-stone-200 bg-stone-50 px-6 py-2 text-xs text-stone-600">
+            This is your own report. Only you and your manager can see it; you cannot see anyone else's.
+          </p>
+        )}
         {report === undefined && <p className="p-6 text-sm text-stone-500">Loading report…</p>}
         {report === null && <NoReport />}
         {report && !person && <Overview report={report} onSelect={onSelect} />}
@@ -53,10 +62,16 @@ export function KpiDashboard({
 function NoReport() {
   return (
     <div className="mx-auto max-w-xl p-6">
-      <h2 className="text-lg font-semibold text-stone-900">No report yet</h2>
+      <h2 className="text-lg font-semibold text-stone-900">No report for you yet</h2>
       <p className="mt-2 text-sm text-stone-600">
-        The KPI agent reads team channels, asks Claude what each person visibly contributed, and writes a report here.
-        With the relay running, run:
+        You see your own report here, and nobody else's. It appears once you have opted in (
+        <strong>KPI insights</strong> in the sidebar), posted in a channel marked <strong>KPI insights on</strong>, and
+        the agent has run. Managers see everyone's: an admin adds a manager's public key (
+        <strong>Copy public key</strong> in the sidebar) to the relay's <code>MANAGER_PUBKEYS</code>.
+      </p>
+      <p className="mt-3 text-sm text-stone-600">
+        The KPI agent reads those channels, asks an AI model what each opted-in person visibly contributed, and writes
+        the reports. With the relay running, run:
       </p>
       <pre className="mt-3 overflow-x-auto rounded-lg bg-stone-900 p-3 text-xs text-stone-100">
         {`cd be\ngo run ./cmd/kpi`}
@@ -145,7 +160,7 @@ function Overview({ report, onSelect }: { report: KpiReport; onSelect: (name: st
         </div>
         <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200">
           {report.people.map((person) => (
-            <li key={person.name}>
+            <li key={person.pubkey ?? person.name}>
               <button
                 onClick={() => onSelect(person.name)}
                 className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-stone-50"
@@ -227,9 +242,11 @@ function PersonView({
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
-      <button onClick={onBack} className="text-sm font-medium text-sky-700 hover:underline">
-        ← All people
-      </button>
+      {!report.personal && (
+        <button onClick={onBack} className="text-sm font-medium text-sky-700 hover:underline">
+          ← All people
+        </button>
+      )}
       <div>
         <h2 className="text-xl font-bold text-stone-900">{person.name}</h2>
         <p className="text-sm text-stone-500">

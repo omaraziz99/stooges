@@ -7,11 +7,24 @@ export const Kind = {
   Deletion: 5,
   Reaction: 7,
   Message: 9,
+  EditChannel: 9002,
   CreateChannel: 9007,
+  AppData: 30078,
   ChannelMetadata: 39000,
 } as const
 
-export type Channel = { id: string; name: string; about: string }
+export type Channel = {
+  id: string
+  name: string
+  about: string
+  /** Pubkey of the creator, the only one who can change KPI review. */
+  creator: string
+  /** A work channel the KPI agent may read. */
+  kpiReview: boolean
+}
+
+/** d tag of a person's own opt-in to KPI insights (kind 30078). */
+export const CONSENT_TAG = 'kpi-consent'
 
 export type Profile = { name: string; createdAt: number }
 
@@ -99,7 +112,13 @@ export function buildChannels(events: NostrEvent[]): Channel[] {
   }
   const tag = (e: NostrEvent, name: string) => e.tags.find((t) => t[0] === name)?.[1] ?? ''
   return [...latest.entries()]
-    .map(([id, e]) => ({ id, name: tag(e, 'name') || id, about: tag(e, 'about') }))
+    .map(([id, e]) => ({
+      id,
+      name: tag(e, 'name') || id,
+      about: tag(e, 'about'),
+      creator: tag(e, 'creator'),
+      kpiReview: tag(e, 'kpi') === 'on',
+    }))
     .sort((a, b) => (a.id === 'general' ? -1 : b.id === 'general' ? 1 : a.name.localeCompare(b.name)))
 }
 
@@ -160,7 +179,7 @@ export const deleteEvents = (client: RelayClient, channelId: string, ids: string
     tags: [...ids.map((id) => ['e', id]), ['h', channelId]],
   })
 
-export const createChannel = (client: RelayClient, id: string, name: string, about: string) =>
+export const createChannel = (client: RelayClient, id: string, name: string, about: string, kpiReview: boolean) =>
   client.publish({
     kind: Kind.CreateChannel,
     created_at: nowSeconds(),
@@ -169,7 +188,32 @@ export const createChannel = (client: RelayClient, id: string, name: string, abo
       ['h', id],
       ['name', name],
       ['about', about],
+      ['kpi', kpiReview ? 'on' : 'off'],
     ],
+  })
+
+/** Turn KPI review of a channel on or off. The relay accepts this only from its creator. */
+export const setChannelKpiReview = (client: RelayClient, channelId: string, on: boolean) =>
+  client.publish({
+    kind: Kind.EditChannel,
+    created_at: nowSeconds(),
+    content: '',
+    tags: [
+      ['h', channelId],
+      ['kpi', on ? 'on' : 'off'],
+    ],
+  })
+
+/**
+ * Opt in to, or out of, KPI insights. The relay keeps only the newest choice,
+ * so it must be dated after the previous one (`after`).
+ */
+export const setConsent = (client: RelayClient, consent: boolean, after: number) =>
+  client.publish({
+    kind: Kind.AppData,
+    created_at: Math.max(nowSeconds(), after + 1),
+    content: JSON.stringify({ consent }),
+    tags: [['d', CONSENT_TAG]],
   })
 
 export const setProfileName = (client: RelayClient, name: string) =>

@@ -7,7 +7,7 @@ A small team chat app with an AI "KPI insights" agent.
   miss: technical leadership, knowledge sharing, industry intelligence, and ownership. Managers
   type `/kpi-<name>` in any channel to open a private, AI-drafted review for that person.
 
-All data in this repo is fictional (`be/seed/project-orbit.json`).
+All data in this repo is fictional (`be/seed/demo.json`).
 
 | Folder | What | Stack | Deploy to |
 |---|---|---|---|
@@ -23,7 +23,7 @@ go run ./cmd/kpi -keygen >> .env     # creates the KPI agent's key pair
 go run ./cmd/relay                   # ws://localhost:7777
 
 # 2. Sample data (another terminal)
-cd be && go run ./cmd/seed           # fictional #project-orbit channel
+cd be && go run ./cmd/seed           # fictional channels; prints two demo logins
 
 # 3. Web app (another terminal)
 cd fe && pnpm install && pnpm dev    # http://localhost:5173
@@ -34,6 +34,17 @@ cd be && go run ./cmd/kpi
 
 Open the app, create an account, go to **#project-orbit**, and type `/kpi-maya`.
 
+The agent only reads channels marked **KPI insights on** (a badge in the channel header, set by
+the channel's creator) and only messages from people who opted in (**KPI insights** in the
+sidebar). A new account is not opted in.
+
+The sample data has three work channels with review on (`#project-orbit`, `#platform-infra`,
+`#design-system`), two private ones the agent never reads (`#lunch-club`, `#weekend-hikers`), and
+seven opted-in people. The seed tool prints secret keys for two of them, an employee (Maya Chen)
+and a manager (Priya Nair), so you can sign in as either. It also prints the `MANAGER_PUBKEYS`
+line that makes Priya a manager: she then sees everyone's report, while Maya sees only her own. These keys are derived from the names, so treat them
+as public.
+
 ## Deploy
 
 ### 1. Relay on Railway
@@ -43,8 +54,11 @@ Open the app, create an account, go to **#project-orbit**, and type `/kpi-maya`.
 2. **Volumes** → add a volume mounted at `/data`, so messages survive redeploys.
 3. **Variables** (none of these are secrets; keep API keys off the server):
    - `KPI_AGENT_PUBKEY`: the public key printed by `go run ./cmd/kpi -keygen`
-   - `SEED_ON_START=true`: loads the fictional `#project-orbit` channel on start (safe to keep on;
+   - `SEED_ON_START=true`: loads the fictional sample channels on start (safe to keep on;
      re-seeding adds no duplicates)
+   - `MANAGER_PUBKEYS`: comma-separated public keys of the managers allowed to read everyone's
+     KPI report. Each manager gets theirs from **Copy public key** in the app's sidebar. Everyone
+     else can read only their own report; unset, nobody can read the team's.
    - `ALLOWED_ORIGINS`: your Vercel URL, e.g. `https://stooges.vercel.app` (optional, recommended)
 4. **Networking** → **Generate Domain**. Your relay URL is `wss://<that-domain>`.
 
@@ -72,11 +86,13 @@ platform.
 
 This is a proof of concept. Before pointing it at real conversations:
 
-- **Access:** anyone who can open the app can read every channel and the KPI report, and run
-  `/kpi`. Restrict who can sign in, and check on the server that only a person's manager can see
-  their review.
+- **Access:** anyone who can open the app can read every channel. A person can read only their own
+  KPI report, and the keys in `MANAGER_PUBKEYS` can read everyone's, but every manager sees every
+  person. Restrict who can sign in, and limit each manager to their own reports.
 - **Keys:** identities are keys stored in the browser's localStorage.
 - **AI provider:** the agent sends chat text to Gemini (or Claude). Free-tier Gemini data may be
   used to improve Google's products; use a paid or company-approved account.
 - **People:** tell the team what is collected and why, keep DMs and private channels out, and treat
-  the output as evidence for 1-on-1 conversations, never as a score.
+  the output as evidence for 1-on-1 conversations, never as a score. Opt-in and work-channel
+  marking are enforced, and people can see their own report, but they see it at the same time as
+  their manager rather than first, and who has opted in is visible to anyone who can reach the relay.

@@ -20,8 +20,8 @@ const (
 	maxChannelName   = 64
 	maxChannelAbout  = 280
 	defaultChannelID = "general"
-	kpiReportTag     = "kpi-report" // d tag of the KPI report (kind 30078)
 	maxReportBytes   = 900 * 1024
+	maxConsentBytes  = 256
 )
 
 var channelIDPattern = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
@@ -112,18 +112,33 @@ func (r *Relay) handleEvent(ctx context.Context, c *client, ev *nostr.Event) {
 		}
 		extra = append(extra, meta)
 
+	case nostr.KindEditGroup:
+		meta, err := r.editChannel(ctx, ev)
+		if err != nil {
+			reject(err.Error())
+			return
+		}
+		extra = append(extra, meta)
 	case nostr.KindAppData:
-		// The KPI report: only the configured agent may publish it.
-		if ev.TagValue("d") != kpiReportTag {
-			reject("blocked: only KPI reports are accepted for kind 30078")
-			return
-		}
-		if r.kpiPublisher == "" || ev.PubKey != r.kpiPublisher {
-			reject("restricted: only the KPI agent can publish reports (set KPI_AGENT_PUBKEY on the relay)")
-			return
-		}
-		if len(ev.Content) > maxReportBytes || !json.Valid([]byte(ev.Content)) {
-			reject("invalid: report must be JSON under 900 KB")
+		_, isReport := reportOwner(ev)
+		switch {
+		case isReport:
+			if r.kpiPublisher == "" || ev.PubKey != r.kpiPublisher {
+				reject("restricted: only the KPI agent can publish reports (set KPI_AGENT_PUBKEY on the relay)")
+				return
+			}
+			if len(ev.Content) > maxReportBytes || !json.Valid([]byte(ev.Content)) {
+				reject("invalid: report must be JSON under 900 KB")
+				return
+			}
+		case ev.TagValue("d") == nostr.KPIConsentTag:
+			// Signed by the person themselves, so nobody can opt in for them.
+			if len(ev.Content) > maxConsentBytes || !json.Valid([]byte(ev.Content)) {
+				reject("invalid: consent must be a small JSON object")
+				return
+			}
+		default:
+			reject("blocked: only KPI reports and KPI opt-ins are accepted for kind 30078")
 			return
 		}
 
@@ -182,7 +197,8 @@ func (r *Relay) createChannel(ctx context.Context, ev *nostr.Event) (*nostr.Even
 	if len([]rune(name)) > maxChannelName || len([]rune(about)) > maxChannelAbout {
 		return nil, errors.New("invalid: channel name or description is too long")
 	}
-	err := r.store.CreateGroup(ctx, id, name, about, ev.PubKey, time.Now().Unix())
+	g := store.Group{ID: id, Name: name, About: about, CreatedBy: ev.PubKey, KPIReview: ev.TagValue("kpi") == "on"}
+	err := r.store.CreateGroup(ctx, g, time.Now().Unix())
 	if errors.Is(err, store.ErrGroupExists) {
 		return nil, fmt.Errorf("invalid: channel %q already exists", id)
 	}
@@ -190,21 +206,65 @@ func (r *Relay) createChannel(ctx context.Context, ev *nostr.Event) (*nostr.Even
 		r.log.Error("create channel failed", "err", err)
 		return nil, errors.New("error: could not create channel")
 	}
-	return r.saveChannelMetadata(ctx, id, name, about)
+	return r.saveChannelMetadata(ctx, g)
 }
 
-// saveChannelMetadata signs and stores the kind 39000 event describing a channel.
-func (r *Relay) saveChannelMetadata(ctx context.Context, id, name, about string) (*nostr.Event, error) {
+// editChannel handles a kind 9002 event: ["h", id] and ["kpi", "on"|"off"].
+// Only the channel's creator may change whether the KPI agent reviews it.
+func (r *Relay) editChannel(ctx context.Context, ev *nostr.Event) (*nostr.Event, error) {
+	g, ok, err := r.store.GetGroup(ctx, ev.TagValue("h"))
+	if err != nil {
+		r.log.Error("channel lookup failed", "err", err)
+		return nil, errors.New("error: channel lookup failed")
+	}
+	if !ok {
+		return nil, fmt.Errorf("invalid: unknown channel %q", ev.TagValue("h"))
+	}
+	if g.CreatedBy != ev.PubKey {
+		return nil, errors.New("restricted: only the channel's creator can change it")
+	}
+	switch ev.TagValue("kpi") {
+	case "on":
+		g.KPIReview = true
+	case "off":
+		g.KPIReview = false
+	default:
+		return nil, errors.New(`invalid: expected a kpi tag of "on" or "off"`)
+	}
+	if err := r.store.SetGroupKPIReview(ctx, g.ID, g.KPIReview); err != nil {
+		r.log.Error("edit channel failed", "err", err)
+		return nil, errors.New("error: could not update channel")
+	}
+	return r.saveChannelMetadata(ctx, g)
+}
+
+// saveChannelMetadata signs and stores the kind 39000 event describing a
+// channel. A ["kpi", "on"] tag tells clients and the KPI agent it is reviewed.
+func (r *Relay) saveChannelMetadata(ctx context.Context, g store.Group) (*nostr.Event, error) {
 	meta := &nostr.Event{
 		CreatedAt: time.Now().Unix(),
 		Kind:      nostr.KindGroupMetadata,
 		Tags: []nostr.Tag{
-			{"d", id},
-			{"name", name},
-			{"about", about},
+			{"d", g.ID},
+			{"name", g.Name},
+			{"about", g.About},
+			{"creator", g.CreatedBy},
 			{"public"},
 			{"open"},
 		},
+	}
+	if g.KPIReview {
+		meta.Tags = append(meta.Tags, nostr.Tag{"kpi", "on"})
+	}
+	// Only the newest metadata is kept, so this one must be newer than the last.
+	prev, err := r.store.Query(ctx, nostr.Filter{
+		Kinds: []int{nostr.KindGroupMetadata}, Authors: []string{r.pubkey}, Tags: map[string][]string{"d": {g.ID}}, Limit: 1,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(prev) > 0 && prev[0].CreatedAt >= meta.CreatedAt {
+		meta.CreatedAt = prev[0].CreatedAt + 1
 	}
 	if err := meta.Sign(r.key); err != nil {
 		return nil, err
@@ -221,10 +281,11 @@ func (r *Relay) EnsureDefaultChannel(ctx context.Context) error {
 	if err != nil || exists {
 		return err
 	}
-	about := "Company-wide chat"
-	if err := r.store.CreateGroup(ctx, defaultChannelID, defaultChannelID, about, r.pubkey, time.Now().Unix()); err != nil {
+	// Owned by the relay, so nobody can turn KPI review on for it.
+	g := store.Group{ID: defaultChannelID, Name: defaultChannelID, About: "Company-wide chat", CreatedBy: r.pubkey}
+	if err := r.store.CreateGroup(ctx, g, time.Now().Unix()); err != nil {
 		return err
 	}
-	_, err = r.saveChannelMetadata(ctx, defaultChannelID, defaultChannelID, about)
+	_, err = r.saveChannelMetadata(ctx, g)
 	return err
 }

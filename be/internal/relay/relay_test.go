@@ -25,13 +25,18 @@ type testConn struct {
 
 func newTestRelay(t *testing.T) string {
 	t.Helper()
+	return newTestRelayWith(t, Options{KPIPublisher: agentPub, Managers: []string{bossPub}})
+}
+
+func newTestRelayWith(t *testing.T, opts Options) string {
+	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
 	key, _ := btcec.NewPrivateKey()
-	r := New(st, key, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{KPIPublisher: agentPub})
+	r := New(st, key, slog.New(slog.NewTextHandler(io.Discard, nil)), opts)
 	if err := r.EnsureDefaultChannel(context.Background()); err != nil {
 		t.Fatal(err)
 	}

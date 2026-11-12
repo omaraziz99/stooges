@@ -4,7 +4,8 @@
 // report to the relay for the dashboard and the /kpi-<name> command.
 //
 //	go run ./cmd/kpi -keygen                     # once: create the agent identity
-//	go run ./cmd/kpi                             # review #project-orbit with Gemini
+//	go run ./cmd/kpi                             # review every channel marked for KPI insights, with Gemini
+//	go run ./cmd/kpi -channel project-orbit      # only this channel
 //	go run ./cmd/kpi -provider claude
 //	go run ./cmd/kpi -dry-run                    # preview what would be sent, no API calls
 //	go run ./cmd/kpi -relay wss://your-relay.up.railway.app
@@ -36,7 +37,7 @@ import (
 
 func main() {
 	relayURL := flag.String("relay", "ws://localhost:7777", "relay WebSocket URL")
-	channels := flag.String("channel", "project-orbit", "comma-separated channel IDs to review")
+	channels := flag.String("channel", "", "comma-separated channel IDs to review (default: every channel marked for KPI insights)")
 	out := flag.String("out", "", "also write the report to this file (optional)")
 	provider := flag.String("provider", "gemini", `AI provider: "gemini" or "claude"`)
 	model := flag.String("model", "", "model name (default: GEMINI_MODEL or "+kpi.DefaultGeminiModel+" for gemini, "+kpi.DefaultModel+" for claude)")
@@ -138,6 +139,16 @@ type options struct {
 
 func run(agent kpi.Agent, opts options) error {
 	model := agent.ModelName()
+	if len(opts.channels) == 0 {
+		marked, err := kpi.ReviewableChannels(opts.relayURL)
+		if err != nil {
+			return fmt.Errorf("list channels: %w", err)
+		}
+		if len(marked) == 0 {
+			return fmt.Errorf("no channel is marked for KPI insights; a channel's creator turns that on from its header in the app")
+		}
+		opts.channels = marked
+	}
 	var units []kpi.Unit
 	for _, ch := range opts.channels {
 		u, err := kpi.LoadChannel(opts.relayURL, ch)
@@ -148,7 +159,7 @@ func run(agent kpi.Agent, opts options) error {
 		units = append(units, u...)
 	}
 	if len(units) == 0 {
-		return fmt.Errorf("no messages found; is the relay running and seeded? (go run ./cmd/seed)")
+		return fmt.Errorf("nothing to review: no one who has opted in to KPI insights has posted in these channels (the sample data opts its users in: go run ./cmd/seed)")
 	}
 
 	if opts.dryRun {
@@ -217,14 +228,11 @@ func run(agent kpi.Agent, opts options) error {
 		fmt.Println("\nSkipping written reviews until every conversation has been reviewed.")
 	}
 
-	data, err := json.Marshal(report)
-	if err != nil {
-		return err
-	}
-	if err := kpi.PublishReport(opts.relayURL, opts.agentKey, data); err != nil {
+	if err := kpi.PublishReport(opts.relayURL, opts.agentKey, report); err != nil {
 		return fmt.Errorf("publish report: %w (does the relay have KPI_AGENT_PUBKEY=%s?)", err, nostr.PubKeyHex(opts.agentKey))
 	}
 	fmt.Printf("\nPublished the report to %s: %d pieces of evidence for %d people\n", opts.relayURL, len(res.Evidence), len(report.People))
+	fmt.Println("Managers can read all of it; everyone else only their own part.")
 
 	if opts.out != "" {
 		pretty, _ := json.MarshalIndent(report, "", "  ")

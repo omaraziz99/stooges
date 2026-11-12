@@ -21,10 +21,17 @@ const (
 	KindDeletion      = 5     // NIP-09 delete own events
 	KindReaction      = 7     // NIP-25 emoji reaction
 	KindChatMessage   = 9     // NIP-29 group chat message
+	KindEditGroup     = 9002  // NIP-29 edit group metadata; turns KPI review on or off
 	KindCreateGroup   = 9007  // NIP-29 create group (channel)
 	KindAuth          = 22242 // NIP-42 client authentication
-	KindAppData       = 30078 // NIP-78 app data; used for the KPI report
+	KindAppData       = 30078 // NIP-78 app data; the KPI report and each person's opt-in
 	KindGroupMetadata = 39000 // NIP-29 group metadata, signed by the relay
+)
+
+// d tags of the kind 30078 events behind KPI insights.
+const (
+	KPIReportTag  = "kpi-report"  // the team report; one person's own is "kpi-report:<pubkey>"
+	KPIConsentTag = "kpi-consent" // a person's opt-in, signed by them: {"consent": true|false}
 )
 
 // Tag is a single event tag, e.g. ["h", "general"].

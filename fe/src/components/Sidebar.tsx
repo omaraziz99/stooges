@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
-import { createChannel, errorText, setProfileName, slugify, type Channel } from '../lib/chat'
+import { createChannel, errorText, setConsent, setProfileName, slugify, type Channel } from '../lib/chat'
 import { displayName } from '../lib/format'
 import { toNsec } from '../lib/keys'
 import type { Status } from '../lib/relay'
-import { useNotify, useProfiles, useRelay } from '../state/relay'
+import { useMyConsent, useNotify, useProfiles, useRelay } from '../state/relay'
 import { Avatar } from './Avatar'
 
 const STATUS: Record<Status, { dot: string; label: string }> = {
@@ -84,6 +84,7 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [about, setAbout] = useState('')
+  const [kpiReview, setKpiReview] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -97,10 +98,11 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
     setBusy(true)
     setError(null)
     try {
-      await createChannel(client, id, name.trim(), about.trim())
+      await createChannel(client, id, name.trim(), about.trim(), kpiReview)
       setOpen(false)
       setName('')
       setAbout('')
+      setKpiReview(false)
       onCreated(id)
     } catch (err) {
       setError(errorText(err))
@@ -141,6 +143,18 @@ function AddChannel({ onCreated }: { onCreated: (id: string) => void }) {
         maxLength={280}
         className={input}
       />
+      <label className="flex items-start gap-2 text-xs text-stone-300">
+        <input
+          type="checkbox"
+          checked={kpiReview}
+          onChange={(e) => setKpiReview(e.target.checked)}
+          className="mt-0.5 accent-sky-600"
+        />
+        <span>
+          Work channel: include in KPI insights
+          <span className="block text-stone-500">Off by default. Everyone sees a badge when it is on.</span>
+        </span>
+      </label>
       {name && slugify(name) && <p className="text-xs text-stone-500">ID: {slugify(name)}</p>}
       {error && <p className="text-xs text-rose-400">{error}</p>}
       <div className="flex gap-2">
@@ -173,7 +187,25 @@ function Me() {
   const name = displayName(profiles, pubkey)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'secret' | 'public' | null>(null)
+  const consent = useMyConsent()
+  const [savingConsent, setSavingConsent] = useState(false)
+
+  const toggleConsent = async () => {
+    const next = !consent.consented
+    const question = next
+      ? 'Opt in to KPI insights?\n\nAn AI agent will read your messages in channels marked "KPI insights on" and note positive contributions for you and your manager. It never reads other channels and records no scores.\n\nYou can opt out at any time.'
+      : 'Opt out of KPI insights?\n\nThe agent will stop reading your messages and leave you out of the next report.'
+    if (!window.confirm(question)) return
+    setSavingConsent(true)
+    try {
+      await setConsent(client, next, consent.lastChange)
+    } catch (err) {
+      notify(errorText(err))
+    } finally {
+      setSavingConsent(false)
+    }
+  }
 
   const saveName = async (e: FormEvent) => {
     e.preventDefault()
@@ -186,11 +218,12 @@ function Me() {
     }
   }
 
-  const copyKey = async () => {
+  // The public key is what an admin adds to the relay's MANAGER_PUBKEYS.
+  const copy = async (which: 'secret' | 'public') => {
     try {
-      await navigator.clipboard.writeText(toNsec(secretKey))
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(which === 'secret' ? toNsec(secretKey) : pubkey)
+      setCopied(which)
+      setTimeout(() => setCopied(null), 2000)
     } catch {
       notify('Could not copy to the clipboard.')
     }
@@ -224,7 +257,23 @@ function Me() {
           <span className="truncate text-sm font-medium text-white">{name}</span>
         </div>
       )}
-      <div className="mt-2 flex gap-3">
+      <button
+        onClick={toggleConsent}
+        disabled={!consent.loaded || savingConsent}
+        aria-pressed={consent.consented}
+        title="Whether the KPI agent may read your messages in work channels. Off until you turn it on."
+        className="mt-2 flex w-full items-center justify-between rounded-md bg-stone-800 px-2 py-1.5 text-left text-xs text-stone-300 hover:bg-stone-700 disabled:opacity-60"
+      >
+        <span>KPI insights</span>
+        <span
+          className={`rounded-full px-2 py-0.5 font-medium ${
+            consent.consented ? 'bg-emerald-600 text-white' : 'bg-stone-600 text-stone-200'
+          }`}
+        >
+          {!consent.loaded ? '…' : consent.consented ? 'Opted in' : 'Not opted in'}
+        </span>
+      </button>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
         <button
           className={link}
           onClick={() => {
@@ -234,8 +283,11 @@ function Me() {
         >
           {editing ? 'Cancel' : 'Edit name'}
         </button>
-        <button className={link} onClick={copyKey}>
-          {copied ? 'Copied!' : 'Copy secret key'}
+        <button className={link} onClick={() => copy('secret')}>
+          {copied === 'secret' ? 'Copied!' : 'Copy secret key'}
+        </button>
+        <button className={link} onClick={() => copy('public')} title="Safe to share. An admin uses it to make you a manager.">
+          {copied === 'public' ? 'Copied!' : 'Copy public key'}
         </button>
         <button className={link} onClick={confirmSignOut}>
           Sign out

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +40,8 @@ type Relay struct {
 	log      *slog.Logger
 	upgrader websocket.Upgrader
 
-	kpiPublisher string // only this pubkey may publish KPI reports ("" = nobody)
+	kpiPublisher string          // only this pubkey may publish KPI reports ("" = nobody)
+	managers     map[string]bool // who may read everyone's KPI report
 
 	mu      sync.RWMutex
 	clients map[*client]struct{}
@@ -49,6 +51,8 @@ type Relay struct {
 type Options struct {
 	// KPIPublisher is the hex pubkey of the KPI agent. Empty disables reports.
 	KPIPublisher string
+	// Managers are the hex pubkeys that may read everyone's KPI report.
+	Managers []string
 	// AllowedOrigins limits which web pages may connect, e.g.
 	// ["https://stooges.vercel.app"]. Empty allows any origin: identity comes
 	// from signed events, not cookies, so this is defence in depth.
@@ -61,12 +65,17 @@ func New(st *store.Store, key *btcec.PrivateKey, log *slog.Logger, opts Options)
 	for _, o := range opts.AllowedOrigins {
 		allowed[strings.TrimRight(strings.TrimSpace(o), "/")] = true
 	}
+	managers := map[string]bool{}
+	for _, m := range opts.Managers {
+		managers[m] = true
+	}
 	return &Relay{
 		store:        st,
 		key:          key,
 		pubkey:       nostr.PubKeyHex(key),
 		log:          log,
 		kpiPublisher: strings.ToLower(strings.TrimSpace(opts.KPIPublisher)),
+		managers:     managers,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  4096,
 			WriteBufferSize: 4096,
@@ -184,7 +193,7 @@ func (r *Relay) handleMessage(ctx context.Context, c *client, data []byte) {
 			c.reply(encode("NOTICE", "invalid: malformed auth event"))
 			return
 		}
-		r.handleAuth(c, &ev)
+		r.handleAuth(ctx, c, &ev)
 	default:
 		c.reply(encode("NOTICE", "invalid: unknown message type "+typ))
 	}
@@ -234,7 +243,7 @@ func (r *Relay) handleReq(ctx context.Context, c *client, args []json.RawMessage
 			return
 		}
 		for i := range events {
-			if seen[events[i].ID] {
+			if seen[events[i].ID] || !r.canRead(c, &events[i]) {
 				continue
 			}
 			seen[events[i].ID] = true
@@ -244,7 +253,68 @@ func (r *Relay) handleReq(ctx context.Context, c *client, args []json.RawMessage
 	c.reply(encode("EOSE", subID))
 }
 
-func (r *Relay) handleAuth(c *client, ev *nostr.Event) {
+// reportOwner says whether ev is a KPI report and, for a personal one, whose.
+func reportOwner(ev *nostr.Event) (owner string, isReport bool) {
+	if ev.Kind != nostr.KindAppData {
+		return "", false
+	}
+	d := ev.TagValue("d")
+	owner, personal := strings.CutPrefix(d, nostr.KPIReportTag+":")
+	if !personal {
+		owner = ""
+	}
+	return owner, personal || d == nostr.KPIReportTag
+}
+
+// canRead reports whether this connection may be sent ev. Everything is
+// public except KPI reports: managers and the agent read all of them, anyone
+// else only their own, and nobody before signing in.
+func (r *Relay) canRead(c *client, ev *nostr.Event) bool {
+	owner, isReport := reportOwner(ev)
+	if !isReport {
+		return true
+	}
+	c.mu.Lock()
+	pubkey := c.pubkey
+	c.mu.Unlock()
+	return pubkey != "" && (r.managers[pubkey] || pubkey == r.kpiPublisher || pubkey == owner)
+}
+
+// sendReports delivers stored KPI reports to subscriptions opened before
+// login. Web clients subscribe as soon as the socket opens, so without this
+// they would see no report until the agent next published one.
+func (r *Relay) sendReports(ctx context.Context, c *client) {
+	c.mu.Lock()
+	subs := make(map[string][]nostr.Filter, len(c.subs))
+	for id, filters := range c.subs {
+		subs[id] = filters
+	}
+	c.mu.Unlock()
+	for id, filters := range subs {
+		seen := map[string]bool{}
+		for _, f := range filters {
+			if len(f.Kinds) > 0 && !slices.Contains(f.Kinds, nostr.KindAppData) {
+				continue
+			}
+			f.Kinds = []int{nostr.KindAppData}
+			events, err := r.store.Query(ctx, f)
+			if err != nil {
+				r.log.Error("report query failed", "err", err)
+				continue
+			}
+			for i := range events {
+				// Only reports were held back; everything else was already sent.
+				if _, isReport := reportOwner(&events[i]); !isReport || seen[events[i].ID] || !r.canRead(c, &events[i]) {
+					continue
+				}
+				seen[events[i].ID] = true
+				c.reply(encode("EVENT", id, &events[i]))
+			}
+		}
+	}
+}
+
+func (r *Relay) handleAuth(ctx context.Context, c *client, ev *nostr.Event) {
 	fail := func(reason string) { c.reply(encode("OK", ev.ID, false, reason)) }
 	if ev.Kind != nostr.KindAuth {
 		fail("invalid: auth event must be kind 22242")
@@ -263,9 +333,13 @@ func (r *Relay) handleAuth(c *client, ev *nostr.Event) {
 		return
 	}
 	c.mu.Lock()
+	first := c.pubkey == ""
 	c.pubkey = ev.PubKey
 	c.mu.Unlock()
 	c.reply(encode("OK", ev.ID, true, ""))
+	if first {
+		r.sendReports(ctx, c)
+	}
 }
 
 // broadcast sends a newly stored event to every subscription that matches it.
@@ -282,6 +356,9 @@ func (r *Relay) broadcast(ev *nostr.Event) {
 	r.mu.RUnlock()
 
 	for _, c := range clients {
+		if !r.canRead(c, ev) {
+			continue
+		}
 		var subIDs []string
 		c.mu.Lock()
 		for id, filters := range c.subs {

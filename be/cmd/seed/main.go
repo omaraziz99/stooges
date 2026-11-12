@@ -1,14 +1,15 @@
-// Command seed loads a channel of sample conversation into a running relay.
+// Command seed loads sample channels and conversations into a running relay.
 // Each dummy user signs in over WebSocket like a real client, so the data goes
 // through the same validation as the app. Keys are derived from user names,
 // so re-running the seed creates no duplicates.
 //
-//	go run ./cmd/seed                                        # seed/project-orbit.json -> ws://localhost:7777
+//	go run ./cmd/seed                                        # seed/demo.json -> ws://localhost:7777
 //	go run ./cmd/seed -relay wss://your-relay.up.railway.app
 package main
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -38,21 +39,28 @@ type message struct {
 	Replies   []message  `json:"replies,omitempty"`
 }
 
+type channel struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	About     string    `json:"about"`
+	KPIReview bool      `json:"kpi_review"` // a work channel the KPI agent may read
+	Messages  []message `json:"messages"`
+}
+
 type seedFile struct {
-	Channel struct {
-		ID    string `json:"id"`
-		Name  string `json:"name"`
-		About string `json:"about"`
-	} `json:"channel"`
-	Users    []string  `json:"users"`
-	Messages []message `json:"messages"`
+	Users []string `json:"users"`
+	// DemoAccounts names the two users to sign in as when showing the app.
+	DemoAccounts struct {
+		Employee string `json:"employee"`
+		Manager  string `json:"manager"`
+	} `json:"demo_accounts"`
+	Channels []channel `json:"channels"`
 }
 
 func main() {
-	file := flag.String("file", "seed/project-orbit.json", "seed data file")
+	file := flag.String("file", "seed/demo.json", "seed data file")
 	relayURL := flag.String("relay", "ws://localhost:7777", "relay WebSocket URL")
 	flag.Parse()
-
 	if err := run(*file, *relayURL); err != nil {
 		log.Fatal(err)
 	}
@@ -70,8 +78,15 @@ func run(path, relayURL string) error {
 	if err := validate(&seed); err != nil {
 		return err
 	}
-	sort.SliceStable(seed.Messages, func(i, j int) bool { return seed.Messages[i].At.Before(seed.Messages[j].At) })
-	start := seed.Messages[0].At
+	// Profiles and channels are dated just before the earliest message.
+	var start time.Time
+	for i := range seed.Channels {
+		msgs := seed.Channels[i].Messages
+		sort.SliceStable(msgs, func(a, b int) bool { return msgs[a].At.Before(msgs[b].At) })
+		if start.IsZero() || msgs[0].At.Before(start) {
+			start = msgs[0].At
+		}
+	}
 
 	// Sign every user in.
 	users := map[string]*client.Conn{}
@@ -88,29 +103,68 @@ func run(path, relayURL string) error {
 	}
 
 	var stats counter
-
 	// Fixed timestamps keep every event ID stable across runs.
 	for _, name := range seed.Users {
 		profile, _ := json.Marshal(map[string]string{"name": name})
 		_, ok, reason, err := users[name].Publish(nostr.KindProfile, start.Add(-time.Hour), string(profile))
 		stats.add(ok, reason, err)
+		// Without an opt-in the KPI agent would not read their messages.
+		_, ok, reason, err = users[name].Publish(nostr.KindAppData, start.Add(-time.Hour), `{"consent":true}`,
+			nostr.Tag{"d", nostr.KPIConsentTag})
+		stats.add(ok, reason, err)
 	}
 
-	creator := users[seed.Messages[0].Author]
+	for i := range seed.Channels {
+		if err := seedChannel(&seed.Channels[i], users, start, &stats); err != nil {
+			return err
+		}
+	}
+
+	fmt.Printf("done: %d new events, %d already there, %d users, %d channels\n",
+		stats.added, stats.duplicates, len(seed.Users), len(seed.Channels))
+
+	// Keys are derived from names, so anyone with this repository can derive
+	// them too: demo data only.
+	secret := func(name string) string { return hex.EncodeToString(keyFor(name).Serialize()) }
+	employee, manager := seed.DemoAccounts.Employee, seed.DemoAccounts.Manager
+	fmt.Println("\nDemo accounts. In the app, sign in with an existing key and paste the secret key:")
+	fmt.Printf("  Employee  %-12s secret key %s\n", employee, secret(employee))
+	fmt.Printf("  Manager   %-12s secret key %s\n", manager, secret(manager))
+	fmt.Printf("\nThe manager sees everyone's KPI report; others see only their own. To make this account a manager,\nset this on the relay (be/.env locally) and restart it:\n  MANAGER_PUBKEYS=%s\n",
+		nostr.PubKeyHex(keyFor(manager)))
+	return nil
+}
+
+// seedChannel creates one channel, as the author of its first message, and posts its history.
+func seedChannel(ch *channel, users map[string]*client.Conn, start time.Time, stats *counter) error {
+	creator := users[ch.Messages[0].Author]
+	kpi := "off"
+	if ch.KPIReview {
+		kpi = "on"
+	}
 	_, ok, reason, err := creator.Publish(nostr.KindCreateGroup, start.Add(-2*time.Hour), "",
-		nostr.Tag{"h", seed.Channel.ID}, nostr.Tag{"name", seed.Channel.Name}, nostr.Tag{"about", seed.Channel.About})
+		nostr.Tag{"h", ch.ID}, nostr.Tag{"name", ch.Name}, nostr.Tag{"about", ch.About}, nostr.Tag{"kpi", kpi})
 	switch {
 	case err != nil:
 		return err
 	case ok:
-		fmt.Printf("created channel #%s\n", seed.Channel.ID)
+		fmt.Printf("created #%s (KPI review %s)\n", ch.ID, kpi)
 	case strings.Contains(reason, "already exists"):
-		fmt.Printf("channel #%s already exists, adding to it\n", seed.Channel.ID)
+		fmt.Printf("#%s already exists, adding to it (KPI review %s)\n", ch.ID, kpi)
+		// It may predate the KPI review setting, so set it as its creator.
+		_, ok, reason, err := creator.Publish(nostr.KindEditGroup, start.Add(-2*time.Hour), "",
+			nostr.Tag{"h", ch.ID}, nostr.Tag{"kpi", kpi})
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Printf("warning: could not set KPI review for #%s: %s\n", ch.ID, reason)
+		}
 	default:
-		return fmt.Errorf("create channel: %s", reason)
+		return fmt.Errorf("create #%s: %s", ch.ID, reason)
 	}
 
-	channelTag := nostr.Tag{"h", seed.Channel.ID}
+	channelTag := nostr.Tag{"h", ch.ID}
 	var post func(m message, root string) error
 	post = func(m message, root string) error {
 		tags := []nostr.Tag{channelTag}
@@ -136,20 +190,23 @@ func run(path, relayURL string) error {
 		}
 		return nil
 	}
-	for _, m := range seed.Messages {
+	for _, m := range ch.Messages {
 		if err := post(m, ""); err != nil {
 			return err
 		}
 	}
-
-	fmt.Printf("done: %d new events, %d already there, %d users\n", stats.added, stats.duplicates, len(seed.Users))
 	return nil
 }
 
-// validate checks every author and reactor is a declared user.
+// validate checks the file is complete and every author and reactor is a declared user.
 func validate(s *seedFile) error {
-	if s.Channel.ID == "" || len(s.Messages) == 0 {
-		return fmt.Errorf("seed needs a channel id and at least one message")
+	if len(s.Channels) == 0 {
+		return fmt.Errorf("seed needs at least one channel")
+	}
+	for _, name := range []string{s.DemoAccounts.Employee, s.DemoAccounts.Manager} {
+		if !slices.Contains(s.Users, name) {
+			return fmt.Errorf("demo account %q is not in users", name)
+		}
 	}
 	var check func(m message) error
 	check = func(m message) error {
@@ -170,9 +227,14 @@ func validate(s *seedFile) error {
 		}
 		return nil
 	}
-	for _, m := range s.Messages {
-		if err := check(m); err != nil {
-			return err
+	for _, ch := range s.Channels {
+		if ch.ID == "" || len(ch.Messages) == 0 {
+			return fmt.Errorf("every channel needs an id and at least one message")
+		}
+		for _, m := range ch.Messages {
+			if err := check(m); err != nil {
+				return fmt.Errorf("#%s: %w", ch.ID, err)
+			}
 		}
 	}
 	return nil
