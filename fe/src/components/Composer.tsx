@@ -1,7 +1,18 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowUp, CornerDownLeft } from 'lucide-react'
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react'
+import { ArrowUp, CornerDownLeft, FileText, LoaderCircle, Paperclip, X } from 'lucide-react'
 import { errorText } from '../lib/chat'
+import { ACCEPT, formatSize, MAX_ATTACHMENTS, uploadFile, type Attachment } from '../lib/files'
 import { useT } from '../lib/prefs'
+import { useRelay } from '../state/relay'
+
+type Pending = {
+  id: number
+  file: File
+  preview: string | null // object URL for images
+  attachment?: Attachment
+  error?: string
+}
+let nextPendingId = 1
 
 export type Suggestion = { value: string; label: string; hint?: string }
 
@@ -18,13 +29,68 @@ export function Composer({
   disabled = false,
 }: {
   placeholder: string
-  onSend: (text: string) => Promise<unknown>
+  onSend: (text: string, attachments: Attachment[]) => Promise<unknown>
   onCommand?: (text: string) => Promise<void> | void
   suggest?: (text: string) => Suggestion[]
   disabled?: boolean
 }) {
   const t = useT()
+  const { secretKey } = useRelay()
   const [text, setText] = useState('')
+  const [pending, setPending] = useState<Pending[]>([])
+  const [dragging, setDragging] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const uploading = pending.some((p) => !p.attachment && !p.error)
+  const ready = pending.flatMap((p) => (p.attachment ? [p.attachment] : []))
+
+  // Free image previews when they go away.
+  const previews = useRef(new Set<string>())
+  useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), [])
+  const dropPreview = (p: Pending) => {
+    if (p.preview) {
+      URL.revokeObjectURL(p.preview)
+      previews.current.delete(p.preview)
+    }
+  }
+
+  const addFiles = (files: File[]) => {
+    if (files.length === 0 || disabled) return
+    const room = MAX_ATTACHMENTS - pending.length
+    if (files.length > room) setError(t('Up to {n} attachments per message.', { n: MAX_ATTACHMENTS }))
+    const added = files.slice(0, Math.max(0, room)).map((file) => {
+      const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null
+      if (preview) previews.current.add(preview)
+      return { id: nextPendingId++, file, preview }
+    })
+    setPending((prev) => [...prev, ...added])
+    for (const p of added) {
+      uploadFile(secretKey, p.file).then(
+        (attachment) => setPending((prev) => prev.map((x) => (x.id === p.id ? { ...x, attachment } : x))),
+        (err) => setPending((prev) => prev.map((x) => (x.id === p.id ? { ...x, error: t(errorText(err)) } : x))),
+      )
+    }
+    inputRef.current?.focus()
+  }
+
+  const removePending = (id: number) =>
+    setPending((prev) => {
+      const gone = prev.find((p) => p.id === id)
+      if (gone) dropPreview(gone)
+      return prev.filter((p) => p.id !== id)
+    })
+
+  const onPaste = (e: ClipboardEvent) => {
+    const files = Array.from(e.clipboardData.files)
+    if (files.length > 0) {
+      e.preventDefault()
+      addFiles(files)
+    }
+  }
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    addFiles(Array.from(e.dataTransfer.files))
+  }
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [active, setActive] = useState(0)
@@ -42,12 +108,16 @@ export function Composer({
   const submit = async (e?: FormEvent) => {
     e?.preventDefault()
     const trimmed = text.trim()
-    if (!trimmed || sending || disabled) return
+    if ((!trimmed && ready.length === 0) || sending || disabled || uploading) return
     setSending(true)
     setError(null)
     try {
       if (trimmed.startsWith('/') && onCommand) await onCommand(trimmed)
-      else await onSend(trimmed)
+      else {
+        await onSend(trimmed, ready)
+        pending.forEach(dropPreview)
+        setPending([])
+      }
       setText('')
     } catch (err) {
       setError(errorText(err))
@@ -81,7 +151,18 @@ export function Composer({
   const isCommand = !!onCommand && text.trim().startsWith('/')
 
   return (
-    <form onSubmit={submit} className="relative shrink-0 px-4 pb-4">
+    <form
+      onSubmit={submit}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) {
+          e.preventDefault()
+          setDragging(true)
+        }
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      className="relative shrink-0 px-4 pb-4"
+    >
       {suggestions.length > 0 && (
         <ul
           role="listbox"
@@ -111,7 +192,49 @@ export function Composer({
         </ul>
       )}
       {error && <p className="mb-1.5 px-1 text-sm text-rose-600">{error}</p>}
-      <div className="rounded-2xl border border-stone-200 bg-white px-3 pt-2.5 pb-2 shadow-[0_1px_2px_rgb(0_0_0/0.04)] focus-within:border-stone-300 focus-within:shadow-[0_2px_8px_rgb(0_0_0/0.06)]">
+      <div
+        className={`rounded-2xl border bg-white px-3 pt-2.5 pb-2 shadow-[0_1px_2px_rgb(0_0_0/0.04)] focus-within:border-stone-300 focus-within:shadow-[0_2px_8px_rgb(0_0_0/0.06)] ${
+          dragging ? 'border-sky-400 ring-2 ring-sky-300' : 'border-stone-200'
+        }`}
+      >
+        {pending.length > 0 && (
+          <ul className="mb-2 flex flex-wrap gap-2" aria-label={t('Attachments')}>
+            {pending.map((p) => (
+              <li
+                key={p.id}
+                className={`relative flex max-w-56 items-center gap-2 rounded-lg border p-1.5 pr-7 text-xs ${
+                  p.error ? 'border-rose-300 bg-rose-50' : 'border-stone-200 bg-stone-50'
+                }`}
+              >
+                {p.preview ? (
+                  <img src={p.preview} alt="" className="size-9 shrink-0 rounded object-cover" />
+                ) : (
+                  <FileText aria-hidden className="size-9 shrink-0 p-1.5 text-stone-500" />
+                )}
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-stone-800">{p.file.name}</span>
+                  <span className={`block truncate ${p.error ? 'text-rose-600' : 'text-stone-500'}`}>
+                    {p.error ?? (p.attachment ? formatSize(p.file.size) : t('Uploading…'))}
+                  </span>
+                </span>
+                {!p.attachment && !p.error && (
+                  <LoaderCircle aria-hidden className="absolute top-1.5 right-1.5 size-4 animate-spin text-stone-400" />
+                )}
+                {(p.attachment || p.error) && (
+                  <button
+                    type="button"
+                    onClick={() => removePending(p.id)}
+                    aria-label={t('Remove attachment')}
+                    title={t('Remove attachment')}
+                    className="absolute top-1 right-1 rounded p-0.5 text-stone-500 hover:bg-black/5 hover:text-stone-900"
+                  >
+                    <X aria-hidden className="size-3.5" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
         <textarea
           ref={inputRef}
           value={text}
@@ -121,16 +244,38 @@ export function Composer({
             setError(null)
           }}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
           rows={rows}
           placeholder={placeholder}
           disabled={disabled}
           aria-label={placeholder}
           className="block max-h-48 min-h-6 w-full resize-none bg-transparent leading-6 outline-none placeholder:text-stone-400 disabled:cursor-not-allowed"
         />
-        <div className="mt-1.5 flex items-center justify-end gap-2">
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            accept={ACCEPT}
+            hidden
+            onChange={(e) => {
+              addFiles(Array.from(e.target.files ?? []))
+              e.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={disabled || pending.length >= MAX_ATTACHMENTS}
+            aria-label={t('Attach file')}
+            title={t('Attach file')}
+            className="flex size-8 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-black/5 hover:text-stone-900 disabled:opacity-40"
+          >
+            <Paperclip aria-hidden className="size-4" />
+          </button>
           <button
             type="submit"
-            disabled={!text.trim() || sending || disabled}
+            disabled={(!text.trim() && ready.length === 0) || sending || disabled || uploading}
             aria-label={sending ? 'Sending' : isCommand ? 'Run' : 'Send'}
             title={isCommand ? t('Run command') : t('Send')}
             className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-300"

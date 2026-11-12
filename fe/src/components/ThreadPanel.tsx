@@ -49,7 +49,7 @@ export function ThreadPanel({
         key={`composer-${rootId}`}
         placeholder={t('Reply…')}
         disabled={!root}
-        onSend={(text) => sendMessage(client, channelId, text, rootId)}
+        onSend={(text, files) => sendMessage(client, channelId, text, rootId, files)}
       />
     </aside>
   )

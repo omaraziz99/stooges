@@ -57,10 +57,11 @@ function Workspace({ newName }: { newName: string | null }) {
   const { client, pubkey } = useRelay()
   const notify = useNotify()
   const t = useT()
-  const { channels } = useChannels()
-  // Until someone picks a channel, show the first one.
+  const { channels, deleted } = useChannels()
+  // Until someone picks a channel, show the first one; if the picked one is
+  // deleted (by anyone), fall back to the first again.
   const [pickedId, setActiveId] = useState<string | null>(null)
-  const activeId = pickedId ?? channels[0]?.id ?? ''
+  const activeId = (pickedId && !deleted.has(pickedId) ? pickedId : null) ?? channels[0]?.id ?? ''
   const [threadRootId, setThreadRootId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [view, setView] = useState<'chat' | 'kpi'>('chat')

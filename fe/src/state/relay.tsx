@@ -135,8 +135,8 @@ export function useMyConsent() {
 
 export function useChannels() {
   const { events, loaded } = useSubscription([{ kinds: [Kind.ChannelMetadata] }])
-  const channels = useMemo(() => buildChannels(events), [events])
-  return { channels, loaded }
+  const { channels, deleted } = useMemo(() => buildChannels(events), [events])
+  return { channels, deleted, loaded }
 }
 
 const ProfilesContext = createContext<Map<string, Profile>>(new Map())

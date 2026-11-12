@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ChartColumn, Ellipsis, Hash, Lock, LogOut, Pencil, Plus, Search } from 'lucide-react'
+import { ChartColumn, Ellipsis, Hash, Lock, LogOut, Pencil, Plus, Search, Star } from 'lucide-react'
 import { createChannel, errorText, setConsent, setProfileName, slugify, type Channel } from '../lib/chat'
 import { displayName } from '../lib/format'
 import type { Status } from '../lib/relay'
 import { useT } from '../lib/prefs'
+import { useStars } from '../lib/stars'
 import { useMyConsent, useNotify, useProfiles, useRelay } from '../state/relay'
 import { Avatar } from './Avatar'
 import { ManglishSwitch, ThemeSwitch } from './PrefsControls'
@@ -60,6 +61,28 @@ export function Sidebar({
 
   const q = query.trim().toLowerCase()
   const shown = q ? channels.filter((c) => c.name.toLowerCase().includes(q) || c.about.toLowerCase().includes(q)) : channels
+  // Starred channels get their own section at the top, as in Buzz.
+  const { pubkey } = useRelay()
+  const { stars } = useStars(pubkey)
+  const starredShown = shown.filter((c) => stars.has(c.id))
+  const otherShown = shown.filter((c) => !stars.has(c.id))
+  const channelRows = (list: Channel[]) => (
+    <ul>
+      {list.map((c) => (
+        <li key={c.id}>
+          <button onClick={() => onSelect(c.id)} className={row(c.id === activeId && !kpiActive)} title={c.about || undefined}>
+            {/* Work channels (KPI insights on) get a lock, like a private channel in Buzz. */}
+            {c.kpiReview ? (
+              <Lock aria-label={t('Work channel')} className="size-4 shrink-0 text-stone-500" />
+            ) : (
+              <Hash aria-hidden className="size-4 shrink-0 text-stone-500" />
+            )}
+            <span className="truncate">{c.name}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
 
   return (
     <>
@@ -92,22 +115,17 @@ export function Sidebar({
             {t('KPI insights')}
           </button>
 
+          {starredShown.length > 0 && (
+            <>
+              <p className={`${sectionLabel} flex items-center gap-1.5`}>
+                <Star aria-hidden className="size-3.5 fill-amber-400 text-amber-500" />
+                {t('Starred')}
+              </p>
+              {channelRows(starredShown)}
+            </>
+          )}
           <p className={sectionLabel}>{t('Channels')}</p>
-          <ul>
-            {shown.map((c) => (
-              <li key={c.id}>
-                <button onClick={() => onSelect(c.id)} className={row(c.id === activeId && !kpiActive)} title={c.about || undefined}>
-                  {/* Work channels (KPI insights on) get a lock, like a private channel in Buzz. */}
-                  {c.kpiReview ? (
-                    <Lock aria-label={t('Work channel')} className="size-4 shrink-0 text-stone-500" />
-                  ) : (
-                    <Hash aria-hidden className="size-4 shrink-0 text-stone-500" />
-                  )}
-                  <span className="truncate">{c.name}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          {channelRows(otherShown)}
           {q && shown.length === 0 && <p className="px-2.5 py-1.5 text-sm text-stone-500">{t('No channels match “{q}”.', { q: query })}</p>}
           <AddChannel onCreated={onSelect} />
         </div>

@@ -96,6 +96,24 @@ const MANGLISH: Record<string, string> = {
   'Turn on': 'Buka',
   'Message #{name}': 'Say something in #{name} lah',
 
+  // Attachments and channel deletion
+  'Attach file': 'Lampir file',
+  Attachments: 'Lampiran',
+  'Uploading…': 'Uploading, wait ah…',
+  'Remove attachment': 'Buang lampiran',
+  'Up to {n} attachments per message.': 'One message maximum {n} file only lah.',
+  'Files can be up to 10 MB.': 'File maximum 10 MB only ah.',
+  "That file type isn't supported. Use an image, PDF, text, or Office/zip file.":
+    'This kind of file cannot leh. Use picture, PDF, text, or Office/zip file lah.',
+  'Too many uploads. Try again in a few minutes.': 'Wah, upload so many already. Rest a while then try again.',
+  'Delete channel': 'Buang channel',
+  'Channel settings': 'Channel setting',
+  'Star channel': 'Bintang channel ni',
+  'Unstar channel': 'Buang bintang',
+  Starred: 'Favourite',
+  'Delete #{name}? Every message in it is deleted for everyone. This cannot be undone.':
+    'Confirm want to buang #{name} ah? All message inside also gone for everybody. Cannot undo one ok.',
+
   // Composer
   'Tab to complete · Enter to run': 'Tab to complete · Enter to jalan',
   'Run command': 'Jalan command',
@@ -163,6 +181,21 @@ const MANGLISH: Record<string, string> = {
   '{n} skipped': '{n} skip',
   'Tip: type {cmd} in any channel to open a review': 'Tip: type {cmd} in any channel to open review lah',
   'Team evidence by pillar': 'Team bukti by pillar',
+  'Team evidence by KPI item': 'Team bukti by KPI item',
+  'KPI items by level': 'KPI item ikut level',
+  'KPI item': 'KPI item',
+  'KPI items': 'KPI item-item',
+  Weight: 'Berat',
+  Evidence: 'Bukti',
+  '{n} person': '{n} orang',
+  '{n} people': '{n} orang',
+  '{n} pieces of evidence': '{n} bukti',
+  '(by level, alphabetical)': '(ikut level, ikut ABC)',
+  'No evidence for this KPI item yet.': 'No bukti for this KPI item yet leh.',
+  'Sample report.': 'Sample report only.',
+  'Built from simple keyword rules, not AI, so the dashboard can be shown without an API key. Do not use it for real reviews.':
+    'This one make from simple keyword rule, not AI, so can demo without API key. Don\'t use for real review ah.',
+  'Technical Delivery': 'Technical Delivery',
   People: 'Orang',
   '(alphabetical)': '(ikut ABC)',
   '{n} messages': '{n} message',

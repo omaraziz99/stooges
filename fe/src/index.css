@@ -14,10 +14,26 @@
 :root {
   --app-bg: #fff;
   color-scheme: light;
+  /* Chart colours for KPI items (categorical slots 1-7, validated light). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
 }
 
 :root[data-theme="kopi-o"] {
   color-scheme: dark;
+  /* The same hues stepped for the dark surface (validated against it). */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
   --app-bg: oklch(16% 0.012 55);
 
   /* Panels and cards (bg-white) and overlays (black/5 hovers, shadows' rings). */

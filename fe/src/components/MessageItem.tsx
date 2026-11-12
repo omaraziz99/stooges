@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { CUSTOM_EMOJI, deleteEvents, errorText, QUICK_REACTIONS, react, type ReactionGroup } from '../lib/chat'
 import { displayName, formatTime, fullTimestamp } from '../lib/format'
+import { attachmentsOf, downloadUrl, formatSize, isImage, textWithoutAttachments } from '../lib/files'
 import type { NostrEvent } from '../lib/relay'
+import { FileText } from 'lucide-react'
 import { useT } from '../lib/prefs'
 import { useNotify, useProfiles, useRelay } from '../state/relay'
 import { Avatar } from './Avatar'
@@ -24,6 +26,10 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
   const [pickerOpen, setPickerOpen] = useState(false)
   const name = displayName(profiles, event.pubkey)
   const mine = event.pubkey === me
+  const attachments = attachmentsOf(event)
+  const text = textWithoutAttachments(event.content, attachments)
+  const images = attachments.filter(isImage)
+  const others = attachments.filter((a) => !isImage(a))
 
   const run = (action: Promise<unknown>) => action.catch((err) => notify(errorText(err)))
 
@@ -69,7 +75,41 @@ export function MessageItem({ event, channelId, compact, reactions, replyCount =
             </time>
           </div>
         )}
-        <p className="leading-relaxed break-words whitespace-pre-wrap text-stone-800">{event.content}</p>
+        {text && <p className="leading-relaxed break-words whitespace-pre-wrap text-stone-800">{text}</p>}
+
+        {images.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {images.map((a) => (
+              <a key={a.url} href={a.url} target="_blank" rel="noopener noreferrer" title={a.name}>
+                <img
+                  src={a.url}
+                  alt={a.name}
+                  loading="lazy"
+                  className="max-h-64 max-w-full rounded-lg border border-stone-200 object-contain sm:max-w-sm"
+                />
+              </a>
+            ))}
+          </div>
+        )}
+        {others.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {others.map((a) => (
+              <a
+                key={a.url}
+                href={downloadUrl(a)}
+                download={a.name}
+                rel="noopener noreferrer"
+                className="flex max-w-xs items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-2 text-sm hover:border-stone-400"
+              >
+                <FileText aria-hidden className="size-5 shrink-0 text-stone-500" />
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-stone-800">{a.name}</span>
+                  <span className="block text-xs text-stone-500">{formatSize(a.size)}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
 
         {reactions && reactions.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">

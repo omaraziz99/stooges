@@ -3,9 +3,12 @@
 A small team chat app with an AI "KPI insights" agent.
 
 - **Chat:** channels, threads, emoji reactions, live updates (a Slack-style UI).
-- **KPI agent:** reads team channels and builds an evidence log of "glue work" that commit counts
-  miss: technical leadership, knowledge sharing, industry intelligence, and ownership. Managers
-  type `/kpi-<name>` in any channel to open a private, AI-drafted review for that person.
+- **KPI agent:** reads team channels and builds an evidence log against an engineering KPI
+  framework: each level (Software Engineer, Senior Software Engineer) has seven weighted items,
+  such as Technical Delivery (30%) or Collaboration (8%), and each person's evidence is sorted into
+  their own level's items. The framework in the repo is a fictional sample
+  (`be/internal/kpi/framework.go`); levels per person are in `be/seed/team.json`. Managers type
+  `/kpi-<name>` in any channel to open a private, AI-drafted review for that person.
 
 All data in this repo is fictional (`be/seed/demo.json`).
 

@@ -1,10 +1,23 @@
 // Types for the report published by `go run ./cmd/kpi` (be/internal/kpi/report.go),
 // plus the /kpi-<name> command used by managers to open a person's review.
 
-export type PillarId = 'technical_leadership' | 'knowledge_sharing' | 'industry_intelligence' | 'ownership_initiative'
+/** A KPI item's ID, such as "se_delivery". Items belong to one level. */
+export type PillarId = string
 export type Impact = 'low' | 'medium' | 'high'
 
-export type Pillar = { id: PillarId; name: string; description: string }
+/** One weighted KPI item of a level (be/internal/kpi/framework.go). */
+export type Pillar = {
+  id: PillarId
+  level: string
+  name: string
+  /** Percent of the level's KPI. */
+  weight: number
+  kpi: string
+  /** What counts as evidence. */
+  description: string
+}
+
+export type Level = { id: string; title: string }
 
 export type Evidence = {
   contributor: string
@@ -39,6 +52,7 @@ export type Review = {
 export type Person = {
   name: string
   pubkey?: string
+  level: string
   messages: number
   counts: Record<PillarId, number>
   impact: Record<Impact, number>
@@ -54,6 +68,9 @@ export type KpiReport = {
   to: string
   conversations: number
   skipped?: string[]
+  framework: string
+  levels: Level[]
+  /** Every KPI item of every level. */
   pillars: Pillar[]
   team: { counts: Record<PillarId, number>; by_month: { month: string; counts: Record<PillarId, number> }[] }
   people: Person[]
@@ -61,13 +78,21 @@ export type KpiReport = {
   personal?: boolean
 }
 
-// Categorical slots 1-4, validated for colour-blind separation on the light
-// surface. Two are below 3:1 contrast, so counts are always shown as text too.
-export const PILLAR_COLORS: Record<PillarId, string> = {
-  technical_leadership: '#2a78d6',
-  knowledge_sharing: '#eb6834',
-  industry_intelligence: '#1baf7a',
-  ownership_initiative: '#eda100',
+/** A level's KPI items, in display order (heaviest first). */
+export const itemsFor = (report: KpiReport, level: string) => report.pillars.filter((p) => p.level === level)
+
+export const levelTitle = (report: KpiReport, level: string) => report.levels.find((l) => l.id === level)?.title ?? level
+
+/**
+ * An item's colour: its position within its level picks categorical slot
+ * 1-7 (--series-N in index.css, validated for colour-blind separation in
+ * both themes). Three light-mode slots are below 3:1 contrast, so items and
+ * counts are always labelled in text too.
+ */
+export function itemColor(report: KpiReport, id: PillarId) {
+  const item = report.pillars.find((p) => p.id === id)
+  const slot = item ? itemsFor(report, item.level).indexOf(item) : -1
+  return slot >= 0 ? `var(--series-${(slot % 7) + 1})` : 'var(--color-stone-400)'
 }
 
 export const IMPACT_LABEL: Record<Impact, string> = { low: 'Low impact', medium: 'Medium impact', high: 'High impact' }
@@ -82,15 +107,16 @@ export const REPORT_TAG = 'kpi-report'
 export function parseReport(content: string): KpiReport | null {
   try {
     const r = JSON.parse(content) as KpiReport
-    return Array.isArray(r.people) && Array.isArray(r.pillars) ? r : null
+    // Reports from before the KPI framework had no levels; they can't be shown.
+    return Array.isArray(r.people) && Array.isArray(r.pillars) && Array.isArray(r.levels) ? r : null
   } catch {
     return null
   }
 }
 
-/** People with no evidence in a pillar: shown as a prompt to ask, never as a judgment. */
+/** A person's KPI items with no evidence: shown as a prompt to ask, never as a judgment. */
 export const pillarsWithoutEvidence = (report: KpiReport, person: Person) =>
-  report.pillars.filter((p) => person.counts[p.id] === 0)
+  itemsFor(report, person.level).filter((p) => !person.counts[p.id])
 
 // ---- /kpi-<name> command ----
 

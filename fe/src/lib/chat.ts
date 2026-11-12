@@ -1,5 +1,6 @@
 // Chat model: event kinds, how raw events become messages/threads/reactions,
 // and the actions that publish new events.
+import { imetaTag, type Attachment } from './files'
 import { nowSeconds, type NostrEvent, type RelayClient } from './relay'
 
 export const Kind = {
@@ -9,6 +10,7 @@ export const Kind = {
   Message: 9,
   EditChannel: 9002,
   CreateChannel: 9007,
+  DeleteChannel: 9008,
   AppData: 30078,
   ChannelMetadata: 39000,
 } as const
@@ -110,8 +112,12 @@ export function buildChannelState(events: NostrEvent[], me: string): ChannelStat
   return state
 }
 
-/** Latest channel metadata per channel ID, by name. */
-export function buildChannels(events: NostrEvent[]): Channel[] {
+/**
+ * Latest channel metadata per channel ID, by name. A channel whose latest
+ * metadata is the relay's ["deleted"] marker is left out and listed in
+ * `deleted`.
+ */
+export function buildChannels(events: NostrEvent[]): { channels: Channel[]; deleted: Set<string> } {
   const latest = new Map<string, NostrEvent>()
   for (const e of events) {
     const id = e.tags.find((t) => t[0] === 'd')?.[1]
@@ -120,7 +126,10 @@ export function buildChannels(events: NostrEvent[]): Channel[] {
     if (!prev || prev.created_at < e.created_at) latest.set(id, e)
   }
   const tag = (e: NostrEvent, name: string) => e.tags.find((t) => t[0] === name)?.[1] ?? ''
-  return [...latest.entries()]
+  const deleted = new Set<string>()
+  for (const [id, e] of latest) if (e.tags.some((t) => t[0] === 'deleted')) deleted.add(id)
+  const channels = [...latest.entries()]
+    .filter(([id]) => !deleted.has(id))
     .map(([id, e]) => ({
       id,
       name: tag(e, 'name') || id,
@@ -129,6 +138,7 @@ export function buildChannels(events: NostrEvent[]): Channel[] {
       kpiReview: tag(e, 'kpi') === 'on',
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
+  return { channels, deleted }
 }
 
 /** Latest display name per pubkey. */
@@ -160,13 +170,24 @@ export function slugify(name: string) {
 
 // ---- Actions: each publishes one signed event ----
 
-export const sendMessage = (client: RelayClient, channelId: string, content: string, rootId?: string) =>
+/** Posts a message; attachment links go in the text and in NIP-92 imeta tags. */
+export const sendMessage = (
+  client: RelayClient,
+  channelId: string,
+  content: string,
+  rootId?: string,
+  attachments: Attachment[] = [],
+) =>
   client.publish({
     kind: Kind.Message,
     created_at: nowSeconds(),
-    content,
-    tags: [['h', channelId], ...(rootId ? [['e', rootId, '', 'root']] : [])],
+    content: [content, ...attachments.map((a) => a.url)].filter(Boolean).join('\n'),
+    tags: [['h', channelId], ...(rootId ? [['e', rootId, '', 'root']] : []), ...attachments.map(imetaTag)],
   })
+
+/** Deletes a channel and everything in it (NIP-29 kind 9008). Creator only. */
+export const deleteChannel = (client: RelayClient, channelId: string) =>
+  client.publish({ kind: Kind.DeleteChannel, created_at: nowSeconds(), content: '', tags: [['h', channelId]] })
 
 export const react = (client: RelayClient, channelId: string, target: NostrEvent, emoji: string) =>
   client.publish({

@@ -17,8 +17,9 @@ On Vercel, set it under Project → Environment Variables and use `fe` as the ro
 
 - Create an account with name, email and password, or log in with email and password (the password never leaves the browser; see `be/README.md`)
 - Channels, threads, emoji reactions, deleting your own messages, live updates
-- **KPI insights**: team totals per pillar, a profile per person with an AI-drafted review and
-  evidence linked back to the original messages
+- **KPI insights**: per level, each KPI item with its weight and the team's evidence count; people
+  grouped by level; a profile per person with their level's items (click one to filter), an
+  AI-drafted review, and evidence linked back to the original messages
 - **`/kpi-<name>`** in any channel opens a private review panel, with name suggestions as you type.
   Commands are never posted
 - Works at phone width

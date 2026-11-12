@@ -1,6 +1,8 @@
-import { Lock } from 'lucide-react'
-import { errorText, sendMessage, setChannelKpiReview, type Channel, type ChannelState } from '../lib/chat'
+import { useEffect, useRef, useState } from 'react'
+import { EllipsisVertical, Lock, Star, Trash2 } from 'lucide-react'
+import { deleteChannel, errorText, sendMessage, setChannelKpiReview, type Channel, type ChannelState } from '../lib/chat'
 import { useT } from '../lib/prefs'
+import { useStars } from '../lib/stars'
 import { useNotify, useRelay } from '../state/relay'
 import { Composer, type Suggestion } from './Composer'
 import { MessageList } from './MessageList'
@@ -26,6 +28,8 @@ export function ChannelView({
   const notify = useNotify()
   const t = useT()
   const isCreator = channel.creator !== '' && channel.creator === pubkey
+  const { stars, toggle: toggleStar } = useStars(pubkey)
+  const starred = stars.has(channel.id)
 
   const toggleReview = async () => {
     const next = !channel.kpiReview
@@ -38,6 +42,18 @@ export function ChannelView({
     if (!window.confirm(question)) return
     try {
       await setChannelKpiReview(client, channel.id, next)
+    } catch (err) {
+      notify(errorText(err))
+    }
+  }
+
+  const removeChannel = async () => {
+    const question = t('Delete #{name}? Every message in it is deleted for everyone. This cannot be undone.', {
+      name: channel.name,
+    })
+    if (!window.confirm(question)) return
+    try {
+      await deleteChannel(client, channel.id)
     } catch (err) {
       notify(errorText(err))
     }
@@ -65,6 +81,7 @@ export function ChannelView({
           ☰
         </button>
         <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1">
           <h1 className="truncate text-[17px] font-semibold text-stone-900">
             {channel.kpiReview ? (
               <Lock aria-label={t('Work channel')} className="mr-1.5 inline size-4 -translate-y-px text-stone-400" />
@@ -73,6 +90,16 @@ export function ChannelView({
             )}
             {channel.name}
           </h1>
+          <button
+            onClick={() => toggleStar(channel.id)}
+            aria-pressed={starred}
+            aria-label={starred ? t('Unstar channel') : t('Star channel')}
+            title={starred ? t('Unstar channel') : t('Star channel')}
+            className="shrink-0 rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+          >
+            <Star aria-hidden className={`size-4 ${starred ? 'fill-amber-400 text-amber-500' : ''}`} />
+          </button>
+          </div>
           {channel.about && <p className="truncate text-xs text-stone-500">{channel.about}</p>}
         </div>
         <span
@@ -94,6 +121,7 @@ export function ChannelView({
             {channel.kpiReview ? t('Turn off') : t('Turn on')}
           </button>
         )}
+        <ChannelMenu starred={starred} onToggleStar={() => toggleStar(channel.id)} onDelete={removeChannel} />
       </header>
 
       <MessageList
@@ -108,10 +136,77 @@ export function ChannelView({
       <Composer
         key={`composer-${channel.id}`}
         placeholder={t('Message #{name}', { name: channel.name })}
-        onSend={(text) => sendMessage(client, channel.id, text)}
+        onSend={(text, files) => sendMessage(client, channel.id, text, undefined, files)}
         onCommand={onCommand}
         suggest={suggest}
       />
     </section>
+  )
+}
+
+/** The ⋯ channel settings menu: star and delete. */
+function ChannelMenu({
+  starred,
+  onToggleStar,
+  onDelete,
+}: {
+  starred: boolean
+  onToggleStar: () => void
+  onDelete: () => void
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Close on outside click or Escape.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const item = 'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-black/5'
+  const run = (action: () => void) => () => {
+    setOpen(false)
+    action()
+  }
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t('Channel settings')}
+        title={t('Channel settings')}
+        className="rounded p-1.5 text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+      >
+        <EllipsisVertical aria-hidden className="size-4" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute top-full right-0 z-20 mt-1 w-48 rounded-xl bg-white p-1 shadow-lg ring-1 ring-black/10"
+        >
+          <button role="menuitem" className={`${item} text-stone-800`} onClick={run(onToggleStar)}>
+            <Star aria-hidden className={`size-4 ${starred ? 'fill-amber-400 text-amber-500' : 'text-stone-500'}`} />
+            {starred ? t('Unstar channel') : t('Star channel')}
+          </button>
+          <div role="separator" className="my-1 border-t border-stone-200" />
+          <button role="menuitem" className={`${item} text-rose-700`} onClick={run(onDelete)}>
+            <Trash2 aria-hidden className="size-4" />
+            {t('Delete channel')}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

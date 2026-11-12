@@ -1,7 +1,7 @@
 // Building blocks shared by the KPI dashboard and the /kpi-<name> review panel.
 import {
   IMPACT_LABEL,
-  PILLAR_COLORS,
+  itemColor,
   pillarsWithoutEvidence,
   type Evidence,
   type KpiReport,
@@ -15,8 +15,10 @@ export const dateFmt = (iso: string) =>
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })
 
-export function Swatch({ pillar }: { pillar: PillarId }) {
-  return <span aria-hidden className="inline-block size-2.5 shrink-0 rounded-sm" style={{ background: PILLAR_COLORS[pillar] }} />
+export function Swatch({ report, pillar }: { report: KpiReport; pillar: PillarId }) {
+  return (
+    <span aria-hidden className="inline-block size-2.5 shrink-0 rounded-sm" style={{ background: itemColor(report, pillar) }} />
+  )
 }
 
 export const pillarName = (report: KpiReport, id: PillarId) => report.pillars.find((p) => p.id === id)?.name ?? id
@@ -62,7 +64,7 @@ export function ReviewCard({
                 {review.highlights.map((h, i) => (
                   <li key={i} className="text-sm text-stone-800">
                     <span className="mr-1.5 inline-flex items-center gap-1.5 font-medium">
-                      <Swatch pillar={h.pillar} />
+                      <Swatch report={report} pillar={h.pillar} />
                       {t(pillarName(report, h.pillar))}:
                     </span>
                     {h.text}
@@ -133,7 +135,7 @@ export function EvidenceList({
         <li key={`${e.unit_id}-${i}`} className={`rounded-lg border border-stone-200 ${compact ? 'p-3' : 'p-4'}`}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-600">
             <span className="flex items-center gap-1.5 font-medium text-stone-800">
-              <Swatch pillar={e.pillar} />
+              <Swatch report={report} pillar={e.pillar} />
               {t(pillarName(report, e.pillar))}
             </span>
             <span>{t(IMPACT_LABEL[e.impact])}</span>
